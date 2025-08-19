@@ -15,36 +15,45 @@
 **	You should have received a copy of the GNU General Public License
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#if defined(_MSC_VER)
 #pragma once
-#endif
 
-#ifndef BINKMOVIE_H
-#define BINKMOVIE_H
+#include "rect.h"
+#include "render2dsentence.h"
+#include "wwstring.h"
+#include <bink.h>
 
 class FontCharsClass;
+class SubTitleManagerClass;
 
-// ----------------------------------------------------------------------------
-//
-// BINK movie player. You'll need to have binkw32.dll in the run directory!
-//
-// To start a movie call Play("movie.bik","subtitle_name");
-// To end movie playing call Stop();
-//
-// In order to change the subtitle properties see SubTitleManagerClass.
-//
-// ----------------------------------------------------------------------------
-
-class BINKMovie
+class BINKMovieClass
 {
-public:
-	static void Play(const char* filename,const char* subtitlename=nullptr, FontCharsClass* font = nullptr);
-	static void Stop();
-	static void Update();
-	static void Render();
-	static void Init();
-	static void Shutdown();
-	static bool	Is_Complete();
-};
+	private:
+		StringClass Filename;
+		HBINK Bink;
+		bool FrameChanged;
+		unsigned TextureCount;
+		unsigned long TicksPerFrame;
 
-#endif
+		struct TextureInfoStruct {
+			TextureClass* Texture;
+			int TextureWidth;
+			int TextureHeight;
+			int TextureLocX;
+			int TextureLocY;
+			RectClass UV;
+			RectClass Rect;
+		};
+
+		TextureInfoStruct* TextureInfos;
+		unsigned char* TempBuffer;
+		Render2DClass Renderer;
+		SubTitleManagerClass* SubTitleManager;
+
+	public:
+		BINKMovieClass(const char* filename,const char* subtitlename,FontCharsClass* font);
+		~BINKMovieClass();
+
+		void Update();
+		void Render();
+		bool Is_Complete();
+};
