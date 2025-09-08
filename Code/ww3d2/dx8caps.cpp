@@ -619,6 +619,7 @@ void DX8Caps::Compute_Caps(WW3DFormat display_format, const D3DADAPTER_IDENTIFIE
 	SupportNPatches = ((Caps.DevCaps&D3DDEVCAPS_NPATCHES)==D3DDEVCAPS_NPATCHES);
 	SupportZBias = ((Caps.RasterCaps&D3DPRASTERCAPS_DEPTHBIAS)==D3DPRASTERCAPS_DEPTHBIAS);
 	supportGamma=((Caps.Caps2&D3DCAPS2_FULLSCREENGAMMA)==D3DCAPS2_FULLSCREENGAMMA);
+	SupportModAlphaAddClr = (Caps.TextureOpCaps & D3DTEXOPCAPS_MODULATEALPHA_ADDCOLOR) == D3DTEXOPCAPS_MODULATEALPHA_ADDCOLOR;
 
 	SupportAnisotropicFiltering=
 		(Caps.TextureFilterCaps&D3DPTFILTERCAPS_MAGFANISOTROPIC) && (Caps.TextureFilterCaps&D3DPTFILTERCAPS_MINFANISOTROPIC);
@@ -627,6 +628,7 @@ void DX8Caps::Compute_Caps(WW3DFormat display_format, const D3DADAPTER_IDENTIFIE
 	DXLOG(("NPatch support: %s\r\n",SupportNPatches ? "Yes" : "No"));
 	DXLOG(("ZBias support: %s\r\n",SupportZBias ? "Yes" : "No"));
 	DXLOG(("Gamma support: %s\r\n",supportGamma ? "Yes" : "No"));
+	DXLOG(("ModAlphaAddClr support: %s\r\n",SupportModAlphaAddClr ? "Yes" : "No"));
 	DXLOG(("Anisotropic filtering support: %s\r\n",SupportAnisotropicFiltering ? "Yes" : "No"));
 
 	Check_Texture_Format_Support(display_format,Caps);
@@ -947,6 +949,16 @@ void DX8Caps::Vendor_Specific_Hacks(const D3DADAPTER_IDENTIFIER9& adapter_id)
 			SupportTextureFormat[WW3D_FORMAT_DXT4]|
 			SupportTextureFormat[WW3D_FORMAT_DXT5];
 	}
+
+	if (VendorId==VENDOR_MATROX) {
+		// G400 and G550 claim support for ModAlphaAddClr but argument limitations make it unusable.
+		if (DeviceId==DEVICE_MATROX_G400 ||
+			DeviceId==DEVICE_MATROX_G550) {
+			DXLOG(("ModAlphaAddClr disabled Matrox G400 and G550 cards (cannot put texture in 2nd arg)\r\n"));
+			SupportModAlphaAddClr = false;
+		}
+	}
+
 	if (VendorId==VENDOR_ATI) {
 		// Rage Pro doesn't handle multitexturing well enough...
 		// It also doesn't really handle render-to-texture...
@@ -989,6 +1001,8 @@ void DX8Caps::Vendor_Specific_Hacks(const D3DADAPTER_IDENTIFIER9& adapter_id)
 			DXLOG(("Maximum screen resolution limited to 1280 x 1024 on ATI Rage 128 cards\r\n"));			
 			MaxDisplayWidth=1280;
 			MaxDisplayHeight=1024;
+			DXLOG(("ModAlphaAddClr disabled ATI Rage 128 cards (cannot put texture in 2nd arg)\r\n"));
+			SupportModAlphaAddClr = false;
 		}
 
 		if (DeviceId==DEVICE_ATI_MOBILITY_RADEON ||

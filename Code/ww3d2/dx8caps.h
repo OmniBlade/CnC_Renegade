@@ -216,6 +216,7 @@ public:
 	bool Support_Bump_Envmap_Luminance() const { return SupportBumpEnvmapLuminance; }
 	bool Support_ZBias() const { return SupportZBias; }
 	bool Support_Anisotropic_Filtering() const { return SupportAnisotropicFiltering; }
+	bool Support_ModAlphaAddClr() const { return SupportModAlphaAddClr; }
 	bool Can_Do_Multi_Pass() const { return CanDoMultiPass; }
 	bool Is_Fog_Allowed() const { return IsFogAllowed; }
 
@@ -285,6 +286,7 @@ private:
 	bool SupportRenderToTextureFormat[WW3D_FORMAT_COUNT];
 	bool SupportZBias;
 	bool SupportAnisotropicFiltering;
+	bool SupportModAlphaAddClr;
 	bool CanDoMultiPass;
 	bool IsFogAllowed;
 	int MaxTexturesPerPass;

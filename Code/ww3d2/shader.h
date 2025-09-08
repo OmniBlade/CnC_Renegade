@@ -144,7 +144,10 @@ public:
 		DETAILCOLOR_SUBR,				// 0110	other - local
 		DETAILCOLOR_BLEND,			// 0111	(localAlpha)*local + (~localAlpha)*other
 		DETAILCOLOR_DETAILBLEND,	//	1000	(otherAlpha)*local + (~otherAlpha)*other
-
+		DETAILCOLOR_ADDSIGNED,		// 1001	(local + other - 0.5)
+		DETAILCOLOR_ADDSIGNED2X,	// 1010	(local + other - 0.5) * 2
+		DETAILCOLOR_SCALE2X,			// 1011	local * other * 2
+		DETAILCOLOR_MODALPHAADDCOLOR,	// 1100 local + localAlpha * other
 		DETAILCOLOR_MAX				//			end of enumeration
 	};
 
@@ -166,11 +169,11 @@ public:
   	{
   		DSTBLEND_ZERO=0,					// destination pixel doesn't affect blending (default)
   		DSTBLEND_ONE,						// destination pixel added unmodified
- 		DSTBLEND_SRC_COLOR,				// destination pixel multiplied by fragment RGB components
- 		DSTBLEND_ONE_MINUS_SRC_COLOR,	// destination pixel multiplied by one minus (i.e. inverse) fragment RGB components
- 		DSTBLEND_SRC_ALPHA,        	// destination pixel multiplied by fragment alpha component
- 		DSTBLEND_ONE_MINUS_SRC_ALPHA, // destination pixel multiplied by fragment inverse alpha
-		DSTBLEND_MAX						// end of enumeration
+			DSTBLEND_SRC_COLOR,				// destination pixel multiplied by fragment RGB components
+			DSTBLEND_ONE_MINUS_SRC_COLOR,	// destination pixel multiplied by one minus (i.e. inverse) fragment RGB components
+			DSTBLEND_SRC_ALPHA,        	// destination pixel multiplied by fragment alpha component
+			DSTBLEND_ONE_MINUS_SRC_ALPHA, // destination pixel multiplied by fragment inverse alpha
+			DSTBLEND_MAX						// end of enumeration
   	};
 
 	enum FogFuncType
@@ -189,7 +192,7 @@ public:
 		GRADIENT_ADD,        //	010	add gradient RGB to fragment RGB, copy gradient A to fragment A
 		GRADIENT_BUMPENVMAP,	// 011
 		GRADIENT_BUMPENVMAPLUMINANCE,	// 100
-		GRADIENT_DOTPRODUCT3,	// 101
+		GRADIENT_MODULATE2X,	// 101
 		GRADIENT_MAX			// end of enumeration
  	};
 
