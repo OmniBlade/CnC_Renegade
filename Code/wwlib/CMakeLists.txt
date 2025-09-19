@@ -1,72 +1,72 @@
 # Set source files
 set(WWLIB_SRC
-    _convert.cpp
-    _mono.cpp
+    #_convert.cpp
+    #_mono.cpp
     argv.cpp
     b64pipe.cpp
     b64straw.cpp
     base64.cpp
-    blit.cpp
-    blowfish.cpp
+    # blit.cpp
+    # blowfish.cpp
     buff.cpp
     bufffile.cpp
     chunkio.cpp
-    convert.cpp
+    # convert.cpp
     cpudetect.cpp
     crc.cpp
     cstraw.cpp
-    data.cpp
+    # data.cpp
     # ddraw.cpp
-    dsurface.cpp
+    # dsurface.cpp
     Except.cpp
     FastAllocator.cpp
     ffactory.cpp
     gcd_lcm.cpp
     hash.cpp
-    hsv.cpp
+    # hsv.cpp
     ini.cpp
     int.cpp
     jshell.cpp
-    keyboard.cpp
+    # keyboard.cpp
     LaunchWeb.cpp
-    lcw.cpp
-    load.cpp
+    # lcw.cpp
+    # load.cpp
     lzo.cpp
     lzo1x_c.cpp
     lzo1x_d.cpp
-    md5.cpp
+    # md5.cpp
     mixfile.cpp
-    mono.cpp
+    # mono.cpp
     mpmath.cpp
     mpu.cpp
     msgloop.cpp
     multilist.cpp
     mutex.cpp
     nstrdup.cpp
-    palette.cpp
-    pcx.cpp
+    # palette.cpp
+    # pcx.cpp
     pipe.cpp
     pk.cpp
     ramfile.cpp
     random.cpp
     rawfile.cpp
-    rc4.cpp
+    # rc4.cpp
     rcfile.cpp
     readline.cpp
     realcrc.cpp
     refcount.cpp
     # regexpr.cpp // Needs gnu_regex?
     registry.cpp
-    rgb.cpp
-    rle.cpp
+    # rgb.cpp
+    # rle.cpp
     rndstrng.cpp
-    sampler.cpp
-    sha.cpp
+    # sampler.cpp
+    # sha.cpp
     slnode.cpp
-    srandom.cpp
-    stimer.cpp
+    # srandom.cpp
+    # stimer.cpp
     straw.cpp
-    strtok_r.cpp
+    # strtok_r.cpp
     systimer.cpp
     tagblock.cpp
     TARGA.CPP
@@ -79,12 +79,12 @@ set(WWLIB_SRC
     win.cpp
     WWCOMUtil.cpp
     wwfile.cpp
-    wwfont.cpp
+    # wwfont.cpp
     wwstring.cpp
     xpipe.cpp
     xstraw.cpp
-    xsurface.cpp
-    _mono.h
+    # xsurface.cpp
+    # _mono.h
     always.h
     argv.h
     b64pipe.h
@@ -92,8 +92,8 @@ set(WWLIB_SRC
     base64.h
     binheap.h
     bittype.h
-    blit.h
-    blitter.h
+    # blit.h
+    # blitter.h
     bool.h
     borlandc.h
     bound.h
@@ -103,7 +103,7 @@ set(WWLIB_SRC
     bufffile.h
     CallbackHook.h
     chunkio.h
-    convert.h
+    # convert.h
     cpudetect.h
     crc.h
     cstraw.h
@@ -125,7 +125,7 @@ set(WWLIB_SRC
     iostruct.h
     keyboard.h
     LaunchWeb.h
-    lcw.h
+    # lcw.h
     listnode.h
     lzo.h
     lzo1x.h
@@ -133,8 +133,8 @@ set(WWLIB_SRC
     lzoconf.h
     mempool.h
     mixfile.h
-    mono.h
-    monodrvr.h
+    # mono.h
+    # monodrvr.h
     mpmath.h
     mpu.h
     msgloop.h
@@ -143,15 +143,15 @@ set(WWLIB_SRC
     Notify.h
     nstrdup.h
     ntree.h
-    palette.h
-    pcx.h
+    # palette.h
+    # pcx.h
     pipe.h
     pk.h
     point.h
     ramfile.h
     random.h
     rawfile.h
-    rc4.h
+    # rc4.h
     rcfile.h
     readline.h
     realcrc.h
@@ -159,25 +159,25 @@ set(WWLIB_SRC
     refcount.h
     regexpr.h
     registry.h
-    rgb.h
+    # rgb.h
     rle.h
     rndstraw.h
     rndstrng.h
     rng.h
     rsacrypt.h
     sampler.h
-    sha.h
-    shapeset.h
+    # sha.h
+    # shapeset.h
     sharebuf.h
     Signaler.h
     simplevec.h
     slist.h
     slnode.h
-    srandom.h
+    # srandom.h
     stl.h
     straw.h
-    strtok_r.h
-    surface.h
+    # strtok_r.h
+    # surface.h
     surfrect.h
     systimer.h
     tagblock.h
@@ -201,7 +201,7 @@ set(WWLIB_SRC
     xmouse.h
     xpipe.h
     xstraw.h
-    xsurface.h
+    # xsurface.h
 )
 
 # Targets to build.
