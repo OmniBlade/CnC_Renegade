@@ -14,6 +14,9 @@ project(commando LANGUAGES C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
+# We have options that depend on other options.
+include(CMakeDependentOption)
+
 # This file handles extra settings wanted/needed for different compilers.
 include(compilers)
 
@@ -42,6 +45,10 @@ endif(SYNTAX_CHECK_ONLY)
 option(W3D_BUILD_OPTION_FFMPEG "Build with ffmpeg." OFF)
 add_feature_info(FFMpegBuild W3D_BUILD_OPTION_FFMPEG "Build Renegade with FFMpeg")
 
+# Do we want to build with ffmpeg for audio playback?
+cmake_dependent_option(W3D_BUILD_OPTION_OPENAL "Build with openal." ON W3D_BUILD_OPTION_FFMPEG OFF)
+add_feature_info(OpenALBuild W3D_BUILD_OPTION_OPENAL "Build Renegade with OpenAL")
+
 if(NOT WIN32)
     add_compile_definitions(__cdecl=)
     add_compile_definitions(__stdcall=)
@@ -58,18 +65,28 @@ if(W3D_BUILD_OPTION_FFMPEG)
     include(ffmpeg)
 endif()
 
+if(W3D_BUILD_OPTION_OPENAL)
+    include(openal)
+endif()
+
 # Find/Add build dependencies and stubs.
 # Only 32bit Windows can make use of these APIs as the libraries shipped with the game.
-# Linux needs miles headers to compile, until miles is removed
-include(miles)
-if(WIN32)
+if(WIN32)   
+    # Do we want to build with miles for audio playback?
+    option(W3D_BUILD_OPTION_MILES "Build with miles." ON)
+    add_feature_info(MilesBuild W3D_BUILD_OPTION_MILES "Build Renegade with Miles")
+    
+    # Make OpenAL/Miles choice a binary choice.
+    if(W3D_BUILD_OPTION_MILES AND NOT W3D_BUILD_OPTION_OPENAL)
+        include(miles)
+    endif()
+
     # Do we want to build with bink for video decoding?
     option(W3D_BUILD_OPTION_BINK "Build with bink." ON)
     add_feature_info(BinkBuild W3D_BUILD_OPTION_BINK "Build Renegade with Bink")
 
     if(W3D_BUILD_OPTION_BINK)
-        include(bink)
-        target_compile_definitions(binkstub INTERFACE W3D_HAS_BINK)
+            include(bink)
     endif()
 
     include(dx9)

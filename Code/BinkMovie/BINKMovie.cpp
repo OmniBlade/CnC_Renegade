@@ -18,6 +18,7 @@
 
 #include "BINKMovie.h"
 #include "NullMoviePlayer.h"
+#include "w3dconfig.h"
 
 #if defined W3D_HAS_FFMPEG
 #include "FFMpegPlayer.h"

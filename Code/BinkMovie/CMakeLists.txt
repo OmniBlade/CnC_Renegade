@@ -11,7 +11,7 @@ add_library(binkmovie STATIC
 )
 
 if(W3D_BUILD_OPTION_FFMPEG)
-    target_compile_definitions(binkmovie PRIVATE W3D_HAS_FFMPEG)
+    #target_compile_definitions(binkmovie PRIVATE W3D_HAS_FFMPEG)
     target_sources(binkmovie PRIVATE
         FFMpegPlayer.cpp
         FFMpegPlayer.h
@@ -21,7 +21,7 @@ elseif(W3D_BUILD_OPTION_BINK)
         BinkPlayer.cpp
         BinkPlayer.h
     )
-    target_compile_definitions(binkmovie PRIVATE W3D_HAS_BINK)
+    #target_compile_definitions(binkmovie PRIVATE W3D_HAS_BINK)
     target_link_libraries(binkmovie PRIVATE
         binkstub
     )

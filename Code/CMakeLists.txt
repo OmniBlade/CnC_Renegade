@@ -44,17 +44,32 @@ target_include_directories(wwcommon INTERFACE
     wwutil
     wolapi
     .
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 target_link_libraries(wwcommon INTERFACE
-    milesstub
     gamespy
     $<$<BOOL:${WIN32}>:d3d9lib>
 )
 
 if(TARGET ffmpeg)
     target_link_libraries(wwcommon INTERFACE ffmpeg)
+    set(W3D_HAS_FFMPEG TRUE)
+elseif(TARGET binkstub)
+    set(W3D_HAS_BINK TRUE)
 endif()
+
+if(TARGET OpenAL::OpenAL)
+    target_link_libraries(wwcommon INTERFACE OpenAL::OpenAL)
+    set(W3D_HAS_OPENAL TRUE)
+endif()
+
+if(TARGET milesstub)
+    target_link_libraries(wwcommon INTERFACE milesstub)
+    set(W3D_HAS_MILES TRUE)
+endif()
+
+configure_file(w3dconfig.h.in w3dconfig.h @ONLY)
 
 # Module static libraries
 add_subdirectory(BinkMovie)
