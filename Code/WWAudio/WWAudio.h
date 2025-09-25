@@ -42,7 +42,11 @@
 #define __WWAUDIO_H
 
 #include "always.h"
+#include "w3dconfig.h"
+
+#ifdef W3D_HAS_MILES
 #include "mss.h"
+#endif
 
 #include "vector.h"
 #include "SoundBuffer.h"
@@ -65,6 +69,32 @@ class LogicalSoundClass;
 class Matrix3D;
 class INIClass;
 
+struct WaveFormatStruct {
+    unsigned short    wFormatTag;
+    unsigned short    nChannels;
+    unsigned   nSamplesPerSec;
+    unsigned   nAvgBytesPerSec;
+    unsigned short    nBlockAlign;
+};
+
+//////////////////////////////////////////////////////////////////////
+//	Speaker configuration
+//////////////////////////////////////////////////////////////////////
+
+//
+//	See MSS.H for a list of speaker types
+//
+//	At the time of this documentation the speaker types were:
+//		#define AIL_3D_2_SPEAKER  0
+//		#define AIL_3D_HEADPHONE  1
+//		#define AIL_3D_SURROUND   2
+//		#define AIL_3D_4_SPEAKER  3
+//
+//  based on this comment we define our own equivalent values for this.
+static constexpr int W3D_3D_2_SPEAKER = 0;
+static constexpr int W3D_3D_HEADPHONE = 1;
+static constexpr int W3D_3D_SURROUND  = 2;
+static constexpr int W3D_3D_4_SPEAKER = 3;
 
 /////////////////////////////////////////////////////////////////////////////////
 //	Class IDs
@@ -136,6 +166,7 @@ public:
 		DRIVER2D_ERROR			= 0,
 		DRIVER2D_DSOUND,
 		DRIVER2D_WAVEOUT,
+		DRIVER2D_OPENAL,
 		DRIVER2D_COUNT
 	} DRIVER_TYPE_2D;
 
@@ -161,7 +192,11 @@ public:
 
 	typedef struct _DRIVER_INFO_STRUCT
 	{
+#ifdef W3D_HAS_MILES
 		HPROVIDER	driver;
+#else
+		void *driver;
+#endif
 		char *		name;
 	} DRIVER_INFO_STRUCT;
 
@@ -203,15 +238,17 @@ public:
 	//////////////////////////////////////////////////////////////////////
 	//	Driver methods
 	//////////////////////////////////////////////////////////////////////
+#ifdef W3D_HAS_MILES
 	HDIGDRIVER				Get_2D_Driver (void) const			{ return m_Driver2D; }
 	HPROVIDER				Get_3D_Driver (void) const			{ return m_Driver3D; }
-	const StringClass &	Get_3D_Driver_Name (void) const	{ return m_Driver3DName; }
 	HPROVIDER				Get_Reverb_Filter (void) const	{ return m_ReverbFilter; }
+#endif
+	const StringClass &	Get_3D_Driver_Name (void) const	{ return m_Driver3DName; }
 
 	//////////////////////////////////////////////////////////////////////
 	//	2D Hardware/driver selection methods
 	//////////////////////////////////////////////////////////////////////
-	DRIVER_TYPE_2D		Open_2D_Device (LPWAVEFORMAT format = NULL);
+	DRIVER_TYPE_2D		Open_2D_Device (WaveFormatStruct *format = NULL);
 	DRIVER_TYPE_2D		Open_2D_Device (bool stereo, int bits, int hertz);
 	bool					Close_2D_Device (void);
 	int					Get_Playback_Rate (void) const		{ return m_PlaybackRate; }
@@ -230,7 +267,9 @@ public:
 
 	// Device selection
 	bool					Select_3D_Device (int index);
+#ifdef W3D_HAS_MILES
 	bool					Select_3D_Device (const char *device_name, HPROVIDER provider);
+#endif
 	bool					Select_3D_Device (DRIVER_TYPE_3D type);
 	bool					Select_3D_Device (const char *device_name);
 	bool					Close_3D_Device (void);
@@ -290,10 +329,11 @@ public:
 	//
 	float					Get_Effects_Level (void)	{ return m_EffectsLevel; }
 
+#ifdef W3D_HAS_MILES
 	//	See ENVIRONMENT_ defines in MSS.H for a list of possible values.
 	int					Get_Reverb_Room_Type (void)		{ return m_ReverbRoomType; }
 	void					Set_Reverb_Room_Type (int type);
-
+#endif
 	//////////////////////////////////////////////////////////////////////
 	//	Volume methods
 	//////////////////////////////////////////////////////////////////////
@@ -529,8 +569,22 @@ public:
 	//
 	//	Debug support for determine what sounds are playing on which "channels"
 	//
-	int						Get_2D_Sample_Count (void) const	{ return m_2DSampleHandles.Count (); }
-	int						Get_3D_Sample_Count (void) const	{ return m_3DSampleHandles.Count (); }
+	int						Get_2D_Sample_Count (void) const
+	{ 
+#ifdef W3D_HAS_MILES
+		return m_2DSampleHandles.Count ();
+#else
+		return 0;
+#endif
+	}
+	int						Get_3D_Sample_Count (void) const
+	{ 
+#ifdef W3D_HAS_MILES
+		return m_3DSampleHandles.Count ();
+#else
+		return 0;
+#endif
+	}
 	AudibleSoundClass *	Peek_2D_Sample (int index);
 	AudibleSoundClass *	Peek_3D_Sample (int index);
 
@@ -559,9 +613,11 @@ protected:
 	void						Release_2D_Handles (void);
 	void						Allocate_3D_Handles (void);
 	void						Release_3D_Handles (void);
+#ifdef W3D_HAS_MILES
 	HSAMPLE					Get_2D_Sample (const AudibleSoundClass &sound_obj);
 	H3DSAMPLE				Get_3D_Sample (const Sound3DClass &sound_obj);
 	H3DPOBJECT				Get_Listener_Handle (void);
+#endif
 	void						ReAssign_2D_Handles (void);
 	void						ReAssign_3D_Handles (void);
 	void						Remove_2D_Sound_Handles (void);
@@ -589,10 +645,12 @@ protected:
 	//////////////////////////////////////////////////////////////////////
 	//	Miles File Callbacks
 	//////////////////////////////////////////////////////////////////////
+#ifdef W3D_HAS_MILES
 	static U32 AILCALLBACK	File_Open_Callback (char const *filename, void **file_handle);
 	static void AILCALLBACK	File_Close_Callback (void *file_handle);
 	static S32 AILCALLBACK	File_Seek_Callback (void *file_handle, S32 offset, U32 type);
 	static U32 AILCALLBACK	File_Read_Callback (void *file_handle, void *buffer, U32 bytes);
+#endif
 
 private:
 
@@ -660,7 +718,9 @@ private:
 	int													m_Max3DSamples;
 	int													m_Max2DBufferSize;
 	int													m_Max3DBufferSize;
+#ifdef W3D_HAS_MILES
 	HTIMER												m_UpdateTimer;
+#endif
 	bool													m_IsMusicEnabled;
 	bool													m_IsDialogEnabled;
 	bool													m_IsCinematicSoundEnabled;
@@ -685,17 +745,21 @@ private:
 	DynamicVectorClass<SOUND_PAGE>				m_PageStack;
 
 	//	Driver information
+#ifdef W3D_HAS_MILES
 	HDIGDRIVER											m_Driver2D;
 	HPROVIDER											m_Driver3D;
 	HPROVIDER											m_Driver3DPseudo;
 	HPROVIDER											m_ReverbFilter;
+#endif
 	DynamicVectorClass<DRIVER_INFO_STRUCT *>	m_Driver3DList;
 	StringClass											m_Driver3DName;
 	int													m_SpeakerType;
 
+#ifdef W3D_HAS_MILES
 	// Available sample handles
 	DynamicVectorClass<HSAMPLE>					m_2DSampleHandles;
 	DynamicVectorClass<H3DSAMPLE>					m_3DSampleHandles;
+#endif
 
 	// Playlist managment
 	DynamicVectorClass<AudibleSoundClass *>	m_Playlist[PAGE_COUNT];
@@ -714,7 +778,9 @@ private:
 
 	//	Reverb support
 	float													m_EffectsLevel;
+#ifdef W3D_HAS_MILES
 	int													m_ReverbRoomType;
+#endif
 
 	// Fade support
 	float													m_NonDialogFadeTime;

@@ -38,7 +38,11 @@
 #ifndef __UTILS_H
 #define __UTILS_H
 
+#ifdef W3D_HAS_MILES
 #include "mss.h"
+#endif
+
+#include <string.h>
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -71,8 +75,18 @@
 class MMSLockClass
 {
 	public:
-		MMSLockClass (void) { ::AIL_lock (); }
-		~MMSLockClass (void) { ::AIL_unlock (); }
+		MMSLockClass (void)
+		{
+#ifdef W3D_HAS_MILES
+			::AIL_lock ();
+#endif
+		}
+		~MMSLockClass (void)
+		{
+#ifdef W3D_HAS_MILES
+			::AIL_unlock ();
+#endif
+		}
 };
 
 

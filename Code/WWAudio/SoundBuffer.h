@@ -42,7 +42,9 @@
 #ifndef __SOUNDBUFFER_H
 #define __SOUNDBUFFER_H
 
+#ifdef W3D_HAS_MILES
 #include "mss.h"
+#endif
 
 #include "refcount.h"
 
@@ -127,7 +129,6 @@ class SoundBufferClass : public RefCountClass
 		unsigned int			m_Type;
 };
 
-
 /////////////////////////////////////////////////////////////////////////////////
 //
 //	StreamSoundBufferClass
@@ -167,7 +168,6 @@ class StreamSoundBufferClass : public SoundBufferClass
 		//	Protected methods
 		//////////////////////////////////////////////////////////////////////
 		virtual void			Free_Buffer (void) override;
-		virtual bool			Load_From_File (HANDLE hfile, unsigned int size, unsigned int offset);
 
 		//////////////////////////////////////////////////////////////////////
 		//	Protected member data

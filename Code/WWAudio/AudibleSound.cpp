@@ -785,7 +785,7 @@ AudibleSoundClass::Initialize_Miles_Handle (void)
 		//
 		// Record the total length of the sample in milliseconds...
 		//
-		m_SoundHandle->Get_Sample_MS_Position ((S32 *)&m_Length, NULL);
+		m_SoundHandle->Get_Sample_MS_Position ((int *)&m_Length, NULL);
 
 		//
 		// Pass our cached settings onto miles
@@ -1199,7 +1199,9 @@ AudibleSoundClass::Allocate_Miles_Handle (void)
 	// If we need to, get a play-handle from the audio system
 	//
 	if (m_SoundHandle == NULL) {
+#ifdef W3D_HAS_MILES
 		Set_Miles_Handle ((MILES_HANDLE)WWAudioClass::Get_Instance ()->Get_2D_Sample (*this));
+#endif
 	}
 
 	return ;

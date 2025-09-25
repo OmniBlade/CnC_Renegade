@@ -83,9 +83,11 @@ public:
 	//
 	//	Handle access
 	//
+#ifdef W3D_HAS_MILES
 	virtual H3DSAMPLE		Get_H3DSAMPLE (void)		{ return NULL; }
 	virtual HSAMPLE		Get_HSAMPLE (void)		{ return NULL; }
 	virtual HSTREAM		Get_HSTREAM (void)		{ return NULL; }
+#endif
 
 	//
 	//	Initialization

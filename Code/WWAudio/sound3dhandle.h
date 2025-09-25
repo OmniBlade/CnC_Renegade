@@ -71,8 +71,9 @@ public:
 	//
 	//	Handle access
 	//
+#ifdef W3D_HAS_MILES
 	H3DSAMPLE					Get_H3DSAMPLE (void) override		{ return SampleHandle; }
-
+#endif
 
 	//
 	//	Inherited
@@ -105,7 +106,9 @@ protected:
 	///////////////////////////////////////////////////////////////////
 	//	Protected member data
 	///////////////////////////////////////////////////////////////////
+#ifdef W3D_HAS_MILES
 	H3DSAMPLE	SampleHandle;
+#endif
 };
 
 

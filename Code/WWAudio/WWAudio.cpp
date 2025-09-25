@@ -134,15 +134,20 @@ WWAudioClass::Is_OK_To_Give_Handle (const AudibleSoundClass &sound_obj)
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////
 WWAudioClass::WWAudioClass (bool lite)
-	: m_Driver2D (NULL),
+	: 
+#ifdef W3D_HAS_MILES
+		m_Driver2D (NULL),
 	  m_Driver3D (NULL),
+#endif
 	  m_PlaybackRate (44100),
 	  m_PlaybackBits (16),
 	  m_PlaybackStereo (true),
 	  m_SpeakerType (0),
+#ifdef W3D_HAS_MILES
 	  m_ReverbFilter ((HPROVIDER)INVALID_MILES_HANDLE),
 	  m_UpdateTimer (-1),
 	  m_Driver3DPseudo (NULL),
+#endif
 	  m_MusicVolume (DEF_MUSIC_VOL),
 	  m_SoundVolume (DEF_SFX_VOL),
 	  m_RealMusicVolume (DEF_MUSIC_VOL),
@@ -163,7 +168,9 @@ WWAudioClass::WWAudioClass (bool lite)
 	  m_CurrPage (PAGE_PRIMARY),
 	  m_AreNewSoundsEnabled (true),
 	  m_BackgroundMusic (NULL),
+#ifdef W3D_HAS_MILES
 	  m_ReverbRoomType (ENVIRONMENT_GENERIC),
+#endif
 	  m_NonDialogFadeTime (DEF_FADE_TIME),
 	  m_FadeType (FADE_NONE),
 	  m_FadeTimer (0),
@@ -175,12 +182,14 @@ WWAudioClass::WWAudioClass (bool lite)
 {
 	m_ForceDisable = lite;
 
+#ifdef W3D_HAS_MILES
 	//
 	// Start Miles Sound System
 	//
 	if (!lite) {
 		AIL_startup ();
 	}
+#endif
 	_theInstance = this;
 
 	//
@@ -274,7 +283,7 @@ WWAudioClass::Flush_Cache (void)
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////
 WWAudioClass::DRIVER_TYPE_2D
-WWAudioClass::Open_2D_Device (LPWAVEFORMAT format)
+WWAudioClass::Open_2D_Device (WaveFormatStruct *format)
 {
 	MMSLockClass lock;
 
@@ -294,6 +303,7 @@ WWAudioClass::Open_2D_Device (LPWAVEFORMAT format)
 	// all the sound handles away from the sound objects.
 	Close_2D_Device ();
 
+#ifdef W3D_HAS_MILES
 	AIL_set_preference (AIL_LOCK_PROTECTION, NO);
 
 	// Try to use DirectSound if possible
@@ -333,6 +343,7 @@ WWAudioClass::Open_2D_Device (LPWAVEFORMAT format)
 		Close_2D_Device ();
 		WWDEBUG_SAY (("WWAudio: Error initializing 2D device.\r\n"));
 	}
+#endif
 
 	// Return the opened device type
 	return type;
@@ -352,6 +363,7 @@ WWAudioClass::Open_2D_Device
 	int hertz
 )
 {
+#if defined W3D_HAS_MILES
 	// Build a wave format structure from the params
 	PCMWAVEFORMAT wave_format = { 0 };
 	wave_format.wf.wFormatTag = WAVE_FORMAT_PCM;
@@ -360,8 +372,8 @@ WWAudioClass::Open_2D_Device
 	wave_format.wf.nAvgBytesPerSec = (wave_format.wf.nChannels * wave_format.wf.nSamplesPerSec * bits) >> 3;
 	wave_format.wf.nBlockAlign = (wave_format.wf.nChannels * bits) >> 3;
 	wave_format.wBitsPerSample = bits;
-
 	DRIVER_TYPE_2D type = DRIVER2D_ERROR;
+
 	while (((type = Open_2D_Device ((LPWAVEFORMAT)&wave_format)) == DRIVER2D_ERROR) &&
 			 (wave_format.wf.nSamplesPerSec >= 11025)) {
 
@@ -375,6 +387,9 @@ WWAudioClass::Open_2D_Device
 
 	// Pass this structure onto the function that actually opens the device
 	return type;
+#else
+	return DRIVER2D_ERROR;
+#endif
 }
 
 
@@ -403,6 +418,7 @@ WWAudioClass::Close_2D_Device (void)
 	// Do we have an open driver handle to close?
 	//
 	bool retval = false;
+#ifdef W3D_HAS_MILES
 	if (m_Driver2D != NULL) {
 
 		//
@@ -412,6 +428,7 @@ WWAudioClass::Close_2D_Device (void)
 		m_Driver2D = NULL;
 		retval = true;
 	}
+#endif
 
 	return retval;
 }
@@ -435,6 +452,7 @@ WWAudioClass::Close_3D_Device (void)
 	Remove_3D_Sound_Handles ();
 	Release_3D_Handles ();
 
+#ifdef W3D_HAS_MILES
 	//
 	// Do we have an open driver handle to close?
 	//
@@ -443,6 +461,7 @@ WWAudioClass::Close_3D_Device (void)
 		m_Driver3D = NULL;
 		retval = true;
 	}
+#endif
 
 	return retval;
 }
@@ -1576,6 +1595,7 @@ WWAudioClass::Release_2D_Handles (void)
 {
 	MMSLockClass lock;
 
+#ifdef W3D_HAS_MILES
 	// Release our hold on all the samples we've allocated
 	for (int index = 0; index < m_2DSampleHandles.Count (); index ++) {
 		HSAMPLE sample = m_2DSampleHandles[index];
@@ -1585,6 +1605,7 @@ WWAudioClass::Release_2D_Handles (void)
 	}
 
 	m_2DSampleHandles.Delete_All ();
+#endif
 	return;
 }
 
@@ -1602,6 +1623,7 @@ WWAudioClass::Allocate_2D_Handles (void)
 	// Start fresh
 	Release_2D_Handles ();
 
+#ifdef W3D_HAS_MILES
 	if (m_Driver2D != NULL) {
 
 		// Attempt to allocate our share of 2D sample handles
@@ -1616,11 +1638,13 @@ WWAudioClass::Allocate_2D_Handles (void)
 		// Record our actual number of available 2D sample handles
 		m_Max2DSamples = m_2DSampleHandles.Count ();
 	}
+#endif
 
 	return;
 }
 
 
+#ifdef W3D_HAS_MILES
 ////////////////////////////////////////////////////////////////////////////////////////////
 //
 //	Get_2D_Sample
@@ -1769,6 +1793,7 @@ WWAudioClass::Get_Listener_Handle (void)
 	MMSLockClass lock;
 	return ::AIL_3D_open_listener (m_Driver3D);
 }
+#endif
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -1781,6 +1806,7 @@ WWAudioClass::Build_3D_Driver_List (void)
 {
 	MMSLockClass lock;
 
+#ifdef W3D_HAS_MILES
 	HPROENUM next = HPROENUM_FIRST;
 	HPROVIDER provider = NULL;
 	char *name = NULL;
@@ -1799,6 +1825,7 @@ WWAudioClass::Build_3D_Driver_List (void)
 			WWDEBUG_SAY (("WWAudio: Reason %s.\r\n", error_info));
 		}
 	}
+#endif
 
 	//
 	// Attempt to select one of the known drivers (in the following order).
@@ -1813,7 +1840,7 @@ WWAudioClass::Build_3D_Driver_List (void)
 		// Couldn't select a known driver, so just use the first possible.
 		//
 		if (m_Driver3DList.Count () > 0) {
-			Select_3D_Device ((int)0);
+			Select_3D_Device (0);
 		}
 	}
 
@@ -1854,10 +1881,12 @@ WWAudioClass::Free_3D_Driver_List (void)
 		}
 	}
 
+#ifdef W3D_HAS_MILES
 	if (m_Driver3D != NULL) {
 		::AIL_close_3D_provider (m_Driver3D);
 		m_Driver3D = NULL;
 	}
+#endif
 
 	//
 	// Clear the list
@@ -1888,7 +1917,9 @@ WWAudioClass::Select_3D_Device (const char *device_name)
 			//	Is this the device we were looking for?
 			//
 			if (::stricmp (info->name, device_name) == 0) {
+#ifdef W3D_HAS_MILES
 				retval = Select_3D_Device (device_name, info->driver);
+#endif
 				break;
 			}
 		}
@@ -1898,6 +1929,7 @@ WWAudioClass::Select_3D_Device (const char *device_name)
 }
 
 
+#ifdef W3D_HAS_MILES
 ////////////////////////////////////////////////////////////////////////////////////////////
 //
 //	Select_3D_Device
@@ -1940,6 +1972,7 @@ WWAudioClass::Select_3D_Device (const char *device_name, HPROVIDER provider)
 	// Return true if we successfully selected the device
 	return retval;
 }
+#endif
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -1956,7 +1989,9 @@ WWAudioClass::Select_3D_Device (int index)
 	// Index valid?
 	//
 	if ((index >= 0) && (index < m_Driver3DList.Count ())) {
+#ifdef W3D_HAS_MILES
 		Select_3D_Device (m_Driver3DList[index]->name, m_Driver3DList[index]->driver);
+#endif
 		WWDEBUG_SAY (("WWAudio: Selecting 3D sound device: %s.\r\n", m_Driver3DList[index]->name));
 		retval = true;
 	}
@@ -2045,6 +2080,7 @@ WWAudioClass::Allocate_3D_Handles (void)
 	// Start fresh
 	Release_3D_Handles ();
 
+#ifdef W3D_HAS_MILES
 	if (m_Driver3D != NULL) {
 
 		// Attempt to allocate our share of 3D sample handles
@@ -2056,6 +2092,7 @@ WWAudioClass::Allocate_3D_Handles (void)
 			}
 		}
 	}
+#endif
 
 	return;
 }
@@ -2071,6 +2108,7 @@ WWAudioClass::Release_3D_Handles (void)
 {
 	MMSLockClass lock;
 
+#ifdef W3D_HAS_MILES
 	//
 	// Release our hold on all the samples we've allocated
 	//
@@ -2082,6 +2120,7 @@ WWAudioClass::Release_3D_Handles (void)
 	}
 
 	m_3DSampleHandles.Delete_All ();
+#endif
 	return;
 }
 
@@ -2096,6 +2135,7 @@ WWAudioClass::Validate_3D_Sound_Buffer (SoundBufferClass *buffer)
 {
 	bool retval = false;
 
+#ifdef W3D_HAS_MILES
 	//
 	// 3D sound buffer MUST be uncompressed mono WAV data
 	//
@@ -2106,6 +2146,7 @@ WWAudioClass::Validate_3D_Sound_Buffer (SoundBufferClass *buffer)
 	{
 		retval = true;
 	}
+#endif
 
 	// Return a true/false result code
 	return retval;
@@ -2171,6 +2212,7 @@ WWAudioClass::ReAssign_3D_Handles (void)
 void
 WWAudioClass::Remove_2D_Sound_Handles (void)
 {
+#ifdef W3D_HAS_MILES
 	//
 	//	Loop over all the 2D handles
 	//
@@ -2187,6 +2229,7 @@ WWAudioClass::Remove_2D_Sound_Handles (void)
 			}
 		}
 	}
+#endif
 
 	return;
 }
@@ -2200,6 +2243,7 @@ WWAudioClass::Remove_2D_Sound_Handles (void)
 void
 WWAudioClass::Remove_3D_Sound_Handles (void)
 {
+#ifdef W3D_HAS_MILES
 	//
 	//	Loop over all the 3D handles
 	//
@@ -2216,6 +2260,7 @@ WWAudioClass::Remove_3D_Sound_Handles (void)
 			}
 		}
 	}
+#endif
 
 	return ;
 }
@@ -2417,11 +2462,13 @@ WWAudioClass::Initialize (const char *registry_subkey_name)
 		//
 		//	Grab the first (and only) filter for use with our 'tinny' effect.
 		//
+#ifdef W3D_HAS_MILES
 		HPROENUM next = HPROENUM_FIRST;
 		char *name = NULL;
 		if (::AIL_enumerate_filters (&next, &m_ReverbFilter, &name) == 0) {
 			m_ReverbFilter = INVALID_MILES_HANDLE;
 		}
+#endif
 
 		m_RealMusicVolume = m_MusicVolume;
 		m_RealSoundVolume = m_SoundVolume;
@@ -2430,8 +2477,10 @@ WWAudioClass::Initialize (const char *registry_subkey_name)
 	//
 	//	Register the file callbacks so we can support streaming from MIX files...
 	//
+#ifdef W3D_HAS_MILES
 	::AIL_set_file_callbacks (File_Open_Callback, File_Close_Callback,
 		File_Seek_Callback, File_Read_Callback);
+#endif
 	return ;
 }
 
@@ -2456,6 +2505,7 @@ WWAudioClass::Initialize
 		Open_2D_Device (stereo, bits, hertz);
 		Build_3D_Driver_List ();
 
+#ifdef W3D_HAS_MILES
 		//
 		//	Grab the first (and only) filter for use with our 'tinny' effect.
 		//
@@ -2464,13 +2514,16 @@ WWAudioClass::Initialize
 		if (::AIL_enumerate_filters (&next, &m_ReverbFilter, &name) == 0) {
 			m_ReverbFilter = INVALID_MILES_HANDLE;
 		}
+#endif
 	}
 
+#ifdef W3D_HAS_MILES
 	//
 	//	Register the file callbacks so we can support streaming from MIX files...
 	//
 	::AIL_set_file_callbacks (File_Open_Callback, File_Close_Callback,
 		File_Seek_Callback, File_Read_Callback);
+#endif
 
 	return;
 }
@@ -2484,6 +2537,7 @@ WWAudioClass::Initialize
 void
 WWAudioClass::Shutdown (void)
 {
+#ifdef W3D_HAS_MILES
 	//
 	// If there is a timer running, then stop the timer...
 	//
@@ -2494,6 +2548,7 @@ WWAudioClass::Shutdown (void)
 		::AIL_release_timer_handle (m_UpdateTimer);
 		m_UpdateTimer = -1;
 	}
+#endif
 
 	//
 	//	Stop the background music
@@ -2524,10 +2579,12 @@ WWAudioClass::Shutdown (void)
 	SAFE_DELETE (m_SoundScene);
 	Close_2D_Device ();
 
+#ifdef W3D_HAS_MILES
 	//
 	// Shutdown Miles Sound System
 	//
 	::AIL_shutdown ();
+#endif
 	return;
 }
 
@@ -3140,6 +3197,7 @@ WWAudioClass::Save_To_Registry (const char *subkey_name)
 	for (int index = 0; index < m_Driver3DList.Count (); index ++) {
 		DRIVER_INFO_STRUCT *info = m_Driver3DList[index];
 
+#ifdef W3D_HAS_MILES
 		//
 		//	Is this the device we were looking for?
 		//
@@ -3147,6 +3205,7 @@ WWAudioClass::Save_To_Registry (const char *subkey_name)
 			device_name = info->name;
 			break;
 		}
+#endif
 	}
 
 	//
@@ -3214,6 +3273,7 @@ WWAudioClass::Save_To_Registry
 }
 
 
+#ifdef W3D_HAS_MILES
 ////////////////////////////////////////////////////////////////////////////////////////////
 //
 //	File_Open_Callback
@@ -3332,6 +3392,7 @@ WWAudioClass::File_Read_Callback (void *file_handle, void *buffer, U32 bytes)
 
 	return retval;
 }
+#endif
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -3547,6 +3608,7 @@ WWAudioClass::Update_Fade (void)
 AudibleSoundClass *
 WWAudioClass::Peek_2D_Sample (int index)
 {
+#ifdef W3D_HAS_MILES
 	if (index < 0 || index > m_2DSampleHandles.Count ()) {
 		return NULL;
 	}
@@ -3563,6 +3625,9 @@ WWAudioClass::Peek_2D_Sample (int index)
 	}
 
 	return retval;
+#else
+	return nullptr;
+#endif
 }
 
 
@@ -3574,6 +3639,7 @@ WWAudioClass::Peek_2D_Sample (int index)
 AudibleSoundClass *
 WWAudioClass::Peek_3D_Sample (int index)
 {
+#ifdef W3D_HAS_MILES
 	if (index < 0 || index > m_3DSampleHandles.Count ()) {
 		return NULL;
 	}
@@ -3590,6 +3656,9 @@ WWAudioClass::Peek_3D_Sample (int index)
 	}
 
 	return retval;
+#else
+	return nullptr;
+#endif
 }
 
 
@@ -3683,12 +3752,14 @@ WWAudioClass::Set_Speaker_Type (int speaker_type)
 {
 	m_SpeakerType = speaker_type;
 
+#ifdef W3D_HAS_MILES
 	//
 	//	Pass the new speaker type onto miles
 	//
 	if (m_Driver3D != NULL) {
 		::AIL_set_3D_speaker_type (m_Driver3D, speaker_type);
 	}
+#endif
 
 	return ;
 }

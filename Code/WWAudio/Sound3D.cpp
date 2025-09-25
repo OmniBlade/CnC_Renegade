@@ -355,6 +355,7 @@ Sound3DClass::Update_Miles_Transform (void)
 		//
 		Matrix3D listener_space_tm = world_to_listener_tm * m_Transform;
 
+#ifdef W3D_HAS_MILES
 		//
 		// Pass the sound's position onto miles
 		//
@@ -374,6 +375,7 @@ Sound3DClass::Update_Miles_Transform (void)
 										  -up.Y,
 										  up.Z,
 										  up.X);
+#endif
 	}
 
 	return ;
@@ -417,11 +419,13 @@ Sound3DClass::Set_Position (const Vector3 &position)
 			Vector3 listener_space_pos;
 			Matrix3D::Inverse_Transform_Vector (m_ListenerTransform, sound_pos, &listener_space_pos);
 
+#ifdef W3D_HAS_MILES
 			//
 			//	Update the object's position inside of Miles
 			//
 			::AIL_set_3D_position (m_SoundHandle->Get_H3DSAMPLE (), -listener_space_pos.Y,
 					listener_space_pos.Z, listener_space_pos.X);
+#endif
 		}
 	}
 
@@ -446,12 +450,14 @@ Sound3DClass::Set_Velocity (const Vector3 &velocity)
 	// Pass the sound's velocity onto miles
 	//
 	if (m_SoundHandle != NULL) {
+#ifdef W3D_HAS_MILES
 
 		//WWDEBUG_SAY (("Current Velocity: %.2f %.2f %.2f\n", m_CurrentVelocity.X, m_CurrentVelocity.Y, m_CurrentVelocity.Z));
 		::AIL_set_3D_velocity_vector (m_SoundHandle->Get_H3DSAMPLE (),
 												-m_CurrentVelocity.Y,
 												m_CurrentVelocity.Z,
 												m_CurrentVelocity.X);
+#endif
 	}
 
 	return ;
@@ -473,9 +479,11 @@ Sound3DClass::Set_DropOff_Radius (float radius)
 
 	// Pass attenuation settings onto miles
 	if (m_SoundHandle != NULL) {
+#ifdef W3D_HAS_MILES
 		::AIL_set_3D_sample_distances (	m_SoundHandle->Get_H3DSAMPLE (),
 													m_DropOffRadius,
 													(m_MaxVolRadius > 1.0F) ? m_MaxVolRadius : 1.0F);
+#endif
 	}
 
 	return ;
@@ -495,9 +503,11 @@ Sound3DClass::Set_Max_Vol_Radius (float radius)
 
 	// Pass attenuation settings onto miles
 	if (m_SoundHandle != NULL) {
+#ifdef W3D_HAS_MILES
 		::AIL_set_3D_sample_distances (	m_SoundHandle->Get_H3DSAMPLE (),
 													m_DropOffRadius,
 													(m_MaxVolRadius > 1.0F) ? m_MaxVolRadius : 1.0F);
+#endif
 	}
 
 	return ;
@@ -545,7 +555,8 @@ Sound3DClass::Initialize_Miles_Handle (void)
 		//
 		// Pass attenuation settings onto miles
 		//
-		::AIL_set_3D_sample_distances (	m_SoundHandle->Get_H3DSAMPLE (),
+#ifdef W3D_HAS_MILES
+	::AIL_set_3D_sample_distances (	m_SoundHandle->Get_H3DSAMPLE (),
 													m_DropOffRadius,
 													(m_MaxVolRadius > 1.0F) ? m_MaxVolRadius : 1.0F);
 
@@ -555,7 +566,7 @@ Sound3DClass::Initialize_Miles_Handle (void)
 		//
 		::AIL_set_3D_sample_effects_level (m_SoundHandle->Get_H3DSAMPLE (),
 				WWAudioClass::Get_Instance ()->Get_Effects_Level ());
-
+#endif
 		//
 		//	Pass the sound's position and orientation onto Miles
 		//
@@ -605,7 +616,9 @@ Sound3DClass::Allocate_Miles_Handle (void)
 	// If we need to, get a play-handle from the audio system
 	//
 	if (m_SoundHandle == NULL) {
+#ifdef W3D_HAS_MILES
 		Set_Miles_Handle ((MILES_HANDLE)WWAudioClass::Get_Instance ()->Get_3D_Sample (*this));
+#endif
 	}
 
 	return ;

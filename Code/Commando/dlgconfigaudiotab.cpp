@@ -312,19 +312,19 @@ DlgConfigAudioTabClass::Configure_Speaker_Combobox (void)
 	switch (type)
 	{
 		default:
-		case AIL_3D_2_SPEAKER:
+		case W3D_3D_2_SPEAKER:
 			combo_box->Set_Curr_Sel (0);
 			break;
 
-		case AIL_3D_HEADPHONE:
+		case W3D_3D_HEADPHONE:
 			combo_box->Set_Curr_Sel (1);
 			break;
 
-		case AIL_3D_SURROUND:
+		case W3D_3D_SURROUND:
 			combo_box->Set_Curr_Sel (2);
 			break;
 
-		case AIL_3D_4_SPEAKER:
+		case W3D_3D_4_SPEAKER:
 			combo_box->Set_Curr_Sel (3);
 			break;
 	}

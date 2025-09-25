@@ -41,7 +41,9 @@
 #ifndef __SOUNDOBJ_H
 #define __SOUNDOBJ_H
 
+#ifdef W3D_HAS_MILES
 #include "mss.h"
+#endif
 
 //#include <malloc.h>
 #include "vector3.h"

@@ -72,8 +72,10 @@ public:
 	//
 	//	Handle access
 	//
+#ifdef W3D_HAS_MILES
 	HSAMPLE						Get_HSAMPLE (void) override		{ return SampleHandle; }
 	HSTREAM						Get_HSTREAM (void) override		{ return StreamHandle; }
+#endif
 
 	//
 	//	Inherited
@@ -106,8 +108,10 @@ protected:
 	///////////////////////////////////////////////////////////////////
 	//	Protected member data
 	///////////////////////////////////////////////////////////////////
+#ifdef W3D_HAS_MILES
 	HSAMPLE		SampleHandle;
 	HSTREAM		StreamHandle;
+#endif
 };
 
 

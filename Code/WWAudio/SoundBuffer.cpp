@@ -74,7 +74,11 @@ SoundBufferClass::SoundBufferClass (void)
 	  m_Rate (0),
 	  m_Bits (0),
 	  m_Channels (0),
+#ifdef W3D_HAS_MILES
 	  m_Type (WAVE_FORMAT_IMA_ADPCM)
+#else
+		m_Type(0)
+#endif
 {
 	return ;
 }
@@ -126,6 +130,7 @@ SoundBufferClass::Determine_Stats (unsigned char *buffer)
 	m_Rate = 0;
 	m_Channels = 0;
 	m_Bits = 0;
+#ifdef W3D_HAS_MILES
 	m_Type = WAVE_FORMAT_IMA_ADPCM;
 
 	// Attempt to get statistical information about this sound
@@ -142,7 +147,7 @@ SoundBufferClass::Determine_Stats (unsigned char *buffer)
 		float bytes_sec = float((m_Channels * m_Rate * m_Bits) >> 3);
 		m_Duration = (unsigned int)((((float)m_Length) / bytes_sec) * 1000.0F);
 	}
-
+#endif
 	return ;
 }
 
@@ -318,24 +323,6 @@ void
 StreamSoundBufferClass::Free_Buffer (void)
 {
 	return ;
-}
-
-
-/////////////////////////////////////////////////////////////////////////////////
-//
-//	Load_From_File
-//
-/////////////////////////////////////////////////////////////////////////////////
-bool
-StreamSoundBufferClass::Load_From_File
-(
-	HANDLE			/*hfile*/,
-	unsigned int	/*size*/,
-	unsigned int	/*offset*/
-)
-{
-	WWPROFILE ("StreamSoundBufferClass::Load_From_File");
-	return true;
 }
 
 

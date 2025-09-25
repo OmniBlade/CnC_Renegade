@@ -57,7 +57,9 @@ SimplePersistFactoryClass<FilteredSoundClass, CHUNKID_FILTERED_SOUND> _FilteredS
 //
 /////////////////////////////////////////////////////////////////////////////////
 FilteredSoundClass::FilteredSoundClass (void)
+#ifdef W3D_HAS_MILES
 	:	m_hFilter ((HPROVIDER)INVALID_MILES_HANDLE)
+#endif
 {
 	return ;
 }
@@ -69,7 +71,10 @@ FilteredSoundClass::FilteredSoundClass (void)
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////
 FilteredSoundClass::FilteredSoundClass (const FilteredSoundClass &src)
-	:	m_hFilter ((HPROVIDER)INVALID_MILES_HANDLE),
+	: 
+#ifdef W3D_HAS_MILES
+	m_hFilter ((HPROVIDER)INVALID_MILES_HANDLE),
+#endif
 		SoundPseudo3DClass (src)
 {
 	(*this) = src;
@@ -111,6 +116,7 @@ void
 FilteredSoundClass::Initialize_Miles_Handle (void)
 {
 	SoundPseudo3DClass::Initialize_Miles_Handle ();
+#ifdef W3D_HAS_MILES
 	m_hFilter = WWAudioClass::Get_Instance ()->Get_Reverb_Filter ();
 	if ((m_SoundHandle != NULL) &&
 		 (m_hFilter != (HPROVIDER)INVALID_MILES_HANDLE)) {
@@ -138,6 +144,7 @@ FilteredSoundClass::Initialize_Miles_Handle (void)
 														"Reverb decay time",
 														&reverb_decay);
 	}
+#endif
 
 	Update_Volume ();
 	return ;
