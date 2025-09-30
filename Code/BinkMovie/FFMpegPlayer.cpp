@@ -27,7 +27,43 @@
 extern "C" {
 	#include <libavcodec/avcodec.h>
 	#include <libswscale/swscale.h>
+	#include <libavutil/avutil.h>
+	#include <libavutil/samplefmt.h>
 }
+
+#ifdef W3D_HAS_OPENAL
+#include <AL/alext.h>
+
+static ALenum Get_AL_Format(unsigned channels, unsigned bits)
+{
+	if (channels == 1 && bits == 8) {
+		return AL_FORMAT_MONO8;
+	}
+
+	if (channels == 1 && bits == 16){
+		return AL_FORMAT_MONO16;
+	}
+
+	if (channels == 1 && bits == 32) {
+		return AL_FORMAT_MONO_FLOAT32;
+	}
+
+	if (channels == 2 && bits == 8) {
+		return AL_FORMAT_STEREO8;
+	}
+
+	if (channels == 2 && bits == 16) {
+		return AL_FORMAT_STEREO16;
+	}
+
+	if (channels == 2 && bits == 32) {
+		return AL_FORMAT_STEREO_FLOAT32;
+	}
+
+	WWDEBUG_SAY(("Unknown OpenAL format: %u channels, %u bits per sample", channels, bits));
+	return AL_FORMAT_MONO8;
+}
+#endif
 
 void FFMpegMovieClass::On_Frame(AVFrame *frame, int stream_idx, int stream_type)
 {
@@ -35,6 +71,60 @@ void FFMpegMovieClass::On_Frame(AVFrame *frame, int stream_idx, int stream_type)
 		av_frame_free(&CurrentFrame);
 		CurrentFrame = av_frame_clone(frame);
 		GotFrame = true;
+	}
+	else if (stream_type == AVMEDIA_TYPE_AUDIO) {
+#ifdef W3D_HAS_OPENAL
+		std::vector<uint8_t> data;
+		uint8_t* frame_data = frame->data[0];
+		AVSampleFormat format = static_cast<AVSampleFormat>(frame->format);
+		const int frame_size = av_samples_get_buffer_size(NULL, frame->ch_layout.nb_channels, frame->nb_samples, format, 1);
+		int bytes_per_sample = av_get_bytes_per_sample(format);
+
+		if (av_sample_fmt_is_planar(format)) {
+			// Convert planar audio to interleaved
+			data.reserve(data.size() + frame_size);
+
+			for (int sample = 0; sample < frame->nb_samples; ++sample) {
+				for (int channel = 0; channel < frame->ch_layout.nb_channels; ++channel) {
+					const uint8_t* src = frame->data[channel] + sample * bytes_per_sample;
+					data.insert(data.end(), src, src + bytes_per_sample);
+				}
+			}
+
+			frame_data = data.data();
+		}
+
+		ALint num_queued;
+		alGetSourcei(ALSource, AL_BUFFERS_QUEUED, &num_queued);
+		if (num_queued >= BINK_AL_BUFFER_COUNT) {
+			WWDEBUG_SAY(("Having too many buffers already queued: %i", num_queued));
+			return;
+		}
+
+		alBufferData(
+			ALBuffers[ALBufferIndex],
+			Get_AL_Format(frame->ch_layout.nb_channels, bytes_per_sample * 8),
+			frame_data,
+			frame_size,
+			frame->sample_rate);
+
+		alSourceQueueBuffers(ALSource, 1, &ALBuffers[ALBufferIndex]);
+
+		++ALBufferIndex;
+
+		if (ALBufferIndex >= BINK_AL_BUFFER_COUNT) {
+			ALBufferIndex = 0;
+		}
+
+		// Unqueue any finished buffers.
+		ALint processed;
+		alGetSourcei(ALSource, AL_BUFFERS_PROCESSED, &processed);
+		while (processed > 0) {
+			ALuint buffer;
+			alSourceUnqueueBuffers(ALSource, 1, &buffer);
+			processed--;
+		}
+#endif
 	}
 }
 
@@ -44,6 +134,10 @@ FFMpegMovieClass::FFMpegMovieClass(const char *filename, const char *subtitlenam
 	Bink(new FFmpegFile(filename)),
 	CurrentFrame(nullptr),
 	ScalingContext(nullptr),
+#ifdef W3D_HAS_OPENAL
+	ALSource(ALuint(-1)),
+	ALBufferIndex(0),
+#endif
 	StartTime(0),
 	GotFrame(false),
 	FrameChanged(true),
@@ -63,11 +157,10 @@ FFMpegMovieClass::FFMpegMovieClass(const char *filename, const char *subtitlenam
 	Bink->Set_Frame_Callback(On_Frame);
 	Bink->Set_User_Data(this);
 
-	bool good = true;
-	// Decode until we have our first video frame
-	while (good && GotFrame == false) {
-		good = Bink->Decode_Packet();
-	}
+#ifdef W3D_HAS_OPENAL
+	alGenBuffers(BINK_AL_BUFFER_COUNT, ALBuffers);
+	alGenSources(1, &ALSource);
+#endif
 
 	const D3DCAPS9& dx8caps = DX8Wrapper::Get_Current_Caps()->Get_DX8_Caps();
 	unsigned poweroftwowidth = 1;
@@ -144,24 +237,40 @@ FFMpegMovieClass::FFMpegMovieClass(const char *filename, const char *subtitlenam
 	// Calculate the time per frame of video
 	unsigned rate = Bink->Get_Frame_Time();
 	TicksPerFrame = (60 / rate);
-	StartTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
 	if (subtitlename && font) {
 		SubTitleManager = std::unique_ptr<SubTitleManagerClass>(SubTitleManagerClass::Create(filename, subtitlename, font));
 	}
+
+	bool good = true;
+	// Decode until we have our first video frame
+	while (good && GotFrame == false) {
+		good = Bink->Decode_Packet();
+
+	}
+
+#ifdef W3D_HAS_OPENAL
+	alSourcePlay(ALSource);
+#endif
+	StartTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 FFMpegMovieClass::~FFMpegMovieClass()
 {
-	if (Bink == nullptr) {
-		return;
-	}
-
 	if (!TextureInfos.empty()) {
 		for (unsigned t = 0; t < TextureCount; ++t) {
 			REF_PTR_RELEASE(TextureInfos[t].Texture);
 		}
 	}
+
+#ifdef W3D_HAS_OPENAL
+	// Unbind the buffers first
+	alSourceStop(ALSource);
+	alSourcei(ALSource, AL_BUFFER, AL_NONE);
+	alDeleteSources(1, &ALSource);
+	// Now delete the buffers
+	alDeleteBuffers(BINK_AL_BUFFER_COUNT, ALBuffers);
+#endif
 }
 
 void FFMpegMovieClass::Update()
@@ -170,6 +279,13 @@ void FFMpegMovieClass::Update()
 		return;
 	}
 
+	bool good = true;
+	// Decode until we have our first video frame
+	while (good && GotFrame == false) {
+		good = Bink->Decode_Packet();
+	}
+
+	// Is it time to render a new frame yet?
 	if (!FrameChanged) {
 		uint64_t time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 		FrameChanged = (time - StartTime) >= Bink->Get_Frame_Time() * Bink->Get_Current_Frame();
@@ -183,10 +299,6 @@ void FFMpegMovieClass::Render()
 	}
 
 	if (CurrentFrame == nullptr) {
-		return;
-	}
-
-	if (CurrentFrame->data == nullptr) {
 		return;
 	}
 
@@ -259,12 +371,6 @@ void FFMpegMovieClass::Render()
 				DX8_ErrorCode(d3d_texture->UnlockRect(0));
 			}
 			GotFrame = false;
-		}
-
-		bool good = true;
-		// Decode until we have our next video frame
-		while (good && GotFrame == false) {
-			good = Bink->Decode_Packet();
 		}
 	}
 

@@ -36,8 +36,10 @@
 
 #include "sound2dhandle.h"
 #include "AudibleSound.h"
+#include "WWAudio.h"
+#include "soundhandle.h"
+#include "wwdebug.h"
 #include "wwprofile.h"
-
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -45,11 +47,19 @@
 //
 //////////////////////////////////////////////////////////////////////
 Sound2DHandleClass::Sound2DHandleClass (void)
-#ifdef W3D_HAS_MILES
-	: SampleHandle ((HSAMPLE)INVALID_MILES_HANDLE)
+	: SampleHandle ((WWAudioClass::Sample2D)INVALID_MILES_HANDLE)
+#ifdef W3D_HAS_OPENAL
+	, LoopCount(0)
 #endif
 {
-	return ;
+#ifdef W3D_HAS_OPENAL
+	alGetError();
+	alGenBuffers(1, &OpenALBuffer);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Failed to generate OpenAL buffer.\n"));
+	}
+#endif
 }
 
 
@@ -60,7 +70,11 @@ Sound2DHandleClass::Sound2DHandleClass (void)
 //////////////////////////////////////////////////////////////////////
 Sound2DHandleClass::~Sound2DHandleClass (void)
 {
-	return ;
+#ifdef W3D_HAS_OPENAL
+	// Unbind any buffers before deleting the object.
+	alSourcei(SampleHandle, AL_BUFFER, AL_NONE);
+	alDeleteBuffers(1, &OpenALBuffer);
+#endif
 }
 
 
@@ -92,8 +106,28 @@ Sound2DHandleClass::Initialize (SoundBufferClass *buffer)
 					Buffer->Get_Raw_Buffer (), Buffer->Get_Raw_Length (), 0);
 		}
 	}
+#elif defined W3D_HAS_OPENAL
+	LoopCount = 0;
+	// Stop source and unbind any existing buffers from this source.
+	alSourceStop(SampleHandle);
+	alSourcei(SampleHandle, AL_BUFFER, AL_NONE);
+
+	if (Buffer != NULL)
+	{
+		alGetError();
+		alBufferData(
+			OpenALBuffer,
+			WWAudioClass::Get_AL_Format(Buffer->Get_Channels(),
+			Buffer->Get_Bits()),
+			Buffer->Get_Raw_Buffer(),
+			Buffer->Get_Raw_Length(),
+			Buffer->Get_Rate());
+		
+		if (alGetError() != AL_NO_ERROR) {
+			WWDEBUG_SAY(("Failed to buffer data for 2D sample\n"));
+		}
+	}
 #endif
-	return ;
 }
 
 
@@ -109,8 +143,19 @@ Sound2DHandleClass::Start_Sample (void)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_start_sample (SampleHandle);
 	}
+#elif defined W3D_HAS_OPENAL
+	if (LoopCount = 0) {
+		LoopCount = 1;
+	}
+
+	Sound2DHandleClass::Queue_Audio();
+	alGetError();
+	alSourcePlay(SampleHandle);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Couldn't play source.\n"));
+	}
 #endif
-	return ;
 }
 
 
@@ -126,8 +171,14 @@ Sound2DHandleClass::Stop_Sample (void)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_stop_sample (SampleHandle);
 	}
+#elif defined W3D_HAS_OPENAL
+	alGetError();
+	alSourcePause(SampleHandle);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Couldn't pause source.\n"));
+	}
 #endif
-	return ;
 }
 
 
@@ -143,8 +194,14 @@ Sound2DHandleClass::Resume_Sample (void)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_resume_sample (SampleHandle);
 	}
+#elif defined W3D_HAS_OPENAL
+	alGetError();
+	alSourcePlay(SampleHandle);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Couldn't resume source.\n"));
+	}
 #endif
-	return ;
 }
 
 
@@ -160,8 +217,17 @@ Sound2DHandleClass::End_Sample (void)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_end_sample (SampleHandle);
 	}
+#elif defined W3D_HAS_OPENAL
+	alGetError();
+	alSourceStop(SampleHandle);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Couldn't stop source.\n"));
+	}
+
+	// Dissociated any queued data.
+	alSourcei(SampleHandle, AL_BUFFER, AL_NONE);
 #endif
-	return ;
 }
 
 
@@ -177,8 +243,15 @@ Sound2DHandleClass::Set_Sample_Pan (int pan)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_set_sample_pan (SampleHandle, pan);
 	}
+#elif defined W3D_HAS_OPENAL
+	ALfloat location[3] = {pan / 127.0F, 0.0F, 0.0F };
+	alGetError();
+	alSourcefv(SampleHandle, AL_POSITION, location);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Couldn't set source pan.\n"));
+	}
 #endif
-	return ;
 }
 
 
@@ -196,6 +269,16 @@ Sound2DHandleClass::Get_Sample_Pan (void)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		retval = ::AIL_sample_pan (SampleHandle);
 	}
+#elif defined W3D_HAS_OPENAL
+	ALfloat location[3] = { 0 };
+	alGetError();
+	alGetSourcefv(SampleHandle, AL_POSITION, location);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Couldn't get source pan.\n"));
+	}
+
+	retval = int(location[0] * 127.0F);
 #endif
 	return retval;
 }
@@ -213,8 +296,14 @@ Sound2DHandleClass::Set_Sample_Volume (int volume)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_set_sample_volume (SampleHandle, volume);
 	}
+#elif defined W3D_HAS_OPENAL
+	alGetError();
+	alSourcef(SampleHandle, AL_GAIN, volume / 127.0f);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Sound2DHandleClass::Set_Sample_Volume couldn't set source gain.\n"));
+	}
 #endif
-	return ;
 }
 
 
@@ -231,6 +320,14 @@ Sound2DHandleClass::Get_Sample_Volume (void)
 #ifdef W3D_HAS_MILES
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		retval = ::AIL_sample_volume (SampleHandle);
+	}
+#elif defined W3D_HAS_OPENAL
+	ALfloat state;
+	alGetError();
+	alGetSourcef(SampleHandle, AL_GAIN, &state);
+
+	if (alGetError() == AL_NO_ERROR) {
+		retval = int(state * 127.0F);
 	}
 #endif
 	return retval;
@@ -249,8 +346,12 @@ Sound2DHandleClass::Set_Sample_Loop_Count (unsigned count)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_set_sample_loop_count (SampleHandle, count);
 	}
+#elif defined W3D_HAS_OPENAL
+	WWDEBUG_SAY(("Sound2D %s requested to loop %u times.\n", Buffer->Get_Filename(), count));
+	// count 0 is special and is supposed to mean infinite... best we can do is UINT_MAX or "lots".
+	LoopCount = count == 0 ? UINT_MAX : count + 1;
+	Sound2DHandleClass::Queue_Audio();
 #endif
-	return ;
 }
 
 
@@ -268,6 +369,25 @@ Sound2DHandleClass::Get_Sample_Loop_Count (void)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		retval = ::AIL_sample_loop_count (SampleHandle);
 	}
+#elif defined W3D_HAS_OPENAL
+	// First clean up any finished buffers.
+	ALint processed;
+	alGetSourcei(SampleHandle, AL_BUFFERS_PROCESSED, &processed);
+	while (processed > 0) {
+			ALuint buffer;
+			alSourceUnqueueBuffers(SampleHandle, 1, &buffer);
+			processed--;
+	}
+
+	// Next query how many buffers are still to play.
+	ALint num_queued;
+	alGetSourcei(SampleHandle, AL_BUFFERS_QUEUED, &num_queued);
+	if (num_queued < 0)
+	{
+		num_queued = 0;
+	}
+
+	retval = num_queued + LoopCount;
 #endif
 	return retval;
 }
@@ -285,8 +405,13 @@ Sound2DHandleClass::Set_Sample_MS_Position (unsigned ms)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_set_sample_ms_position (SampleHandle, ms);
 	}
+#elif defined W3D_HAS_OPENAL
+	alGetError();
+	alSourcef(SampleHandle, AL_SEC_OFFSET, ms / 1000.0F);
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Failed to set OpenAL source position.\n"));
+	}
 #endif
-	return ;
 }
 
 
@@ -300,10 +425,32 @@ Sound2DHandleClass::Get_Sample_MS_Position (int *len, int *pos)
 {
 #ifdef W3D_HAS_MILES
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
-		::AIL_sample_ms_position (SampleHandle, len, pos);
+		S32 mlen, mpos;
+		::AIL_sample_ms_position (SampleHandle, &mlen, &mpos);
+		if (pos != nullptr) {
+			*pos = int(mpos);
+		}
+
+		if (len != nullptr) {
+			*len = int(mlen);
+		}
+	}
+#elif defined W3D_HAS_OPENAL
+	if (pos != nullptr) {
+		ALfloat sec_pos;
+		alGetError();
+		alGetSourcef(SampleHandle, AL_SEC_OFFSET, &sec_pos);
+
+		if (alGetError() == AL_NO_ERROR) {
+			*pos = int(sec_pos * 1000.0F);
+		}
+	}
+
+	if (len != nullptr) {
+		// The buffer object should already have calculated the duration in ms.
+		*len = Buffer->Get_Duration();
 	}
 #endif
-	return ;
 }
 
 
@@ -319,8 +466,17 @@ Sound2DHandleClass::Set_Sample_User_Data (int i, void *val)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		::AIL_set_sample_user_data (SampleHandle, i, val);
 	}
+#elif defined W3D_HAS_OPENAL
+	WWASSERT(i == 0);
+	ALint state;
+	alGetError();
+	alGetSourcei(SampleHandle, AL_SOURCE_STATE, &state);
+
+	if (alGetError() == AL_NO_ERROR) {
+		// Miles implementation uses this exclusively to associate an audible class with a handle.
+		WWAudioClass::Get_Instance()->WWAudioClass::Set_2D_User(SampleHandle, static_cast<AudibleSoundClass *>(val));
+	}
 #endif
-	return ;
 }
 
 
@@ -338,24 +494,14 @@ Sound2DHandleClass::Get_Sample_User_Data (int i)
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
 		retval = ::AIL_sample_user_data (SampleHandle, i);
 	}
-#endif
-	return retval;
-}
+#elif defined W3D_HAS_OPENAL
+	ALint state;
+	alGetError();
+	alGetSourcei(SampleHandle, AL_SOURCE_STATE, &state);
 
-
-//////////////////////////////////////////////////////////////////////
-//
-//	Get_Sample_Playback_Rate
-//
-//////////////////////////////////////////////////////////////////////
-int
-Sound2DHandleClass::Get_Sample_Playback_Rate (void)
-{	
-	int retval = 0;
-
-#ifdef W3D_HAS_MILES
-	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
-		retval = ::AIL_sample_playback_rate (SampleHandle);
+	if (alGetError() == AL_NO_ERROR) {
+		// Miles implementation uses this exclusively to associate an audible class with a handle.
+		retval = WWAudioClass::Get_Instance()->WWAudioClass::Get_2D_User(SampleHandle);
 	}
 #endif
 	return retval;
@@ -364,18 +510,63 @@ Sound2DHandleClass::Get_Sample_Playback_Rate (void)
 
 //////////////////////////////////////////////////////////////////////
 //
-//	Set_Sample_Playback_Rate
+//	Get_Sample_Pitch_Factor
+//
+//////////////////////////////////////////////////////////////////////
+float
+Sound2DHandleClass::Get_Sample_Pitch_Factor (void)
+{	
+	float retval = 0;
+	
+#ifdef W3D_HAS_MILES
+	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
+		//
+		//	Get the base rate of the sound and scale our playback rate
+		// based on the factor
+		//
+		int rate = ::AIL_sample_playback_rate (SampleHandle);
+		retval = float(rate) / Buffer->Get_Rate();
+	}
+#elif defined W3D_HAS_OPENAL
+	ALfloat pitch;
+	alGetError();
+	alGetSourcef(SampleHandle, AL_PITCH, &pitch);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Failed to retrieve OpenAL source pitch.\n"));
+	}
+
+	retval = pitch;
+#endif
+	return retval;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+//
+//	Set_Sample_Pitch_Factor
 //
 //////////////////////////////////////////////////////////////////////
 void
-Sound2DHandleClass::Set_Sample_Playback_Rate (int rate)
+Sound2DHandleClass::Set_Sample_Pitch_Factor (float pitch)
 {
 #ifdef W3D_HAS_MILES
 	if (SampleHandle != (HSAMPLE)INVALID_MILES_HANDLE) {
+		//
+		//	Get the base rate of the sound and scale our playback rate
+		// based on the factor
+		//
+		int rate = int(pitch * Buffer->Get_Rate());
 		::AIL_set_sample_playback_rate (SampleHandle, rate);
 	}
+#elif defined W3D_HAS_OPENAL
+	alGetError();
+	alSourcef(SampleHandle, AL_PITCH, pitch);
+
+	if (alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Failed to set OpenAL source pitch.\n"));
+	}
 #endif
-	return ;
 }
 
 
@@ -385,10 +576,43 @@ Sound2DHandleClass::Set_Sample_Playback_Rate (int rate)
 //
 //////////////////////////////////////////////////////////////////////
 void
-Sound2DHandleClass::Set_Miles_Handle (void *handle)
+Sound2DHandleClass::Set_Miles_Handle (MILES_HANDLE handle)
 {
-#ifdef W3D_HAS_MILES
-	SampleHandle = (HSAMPLE)handle;
+	SampleHandle = WWAudioClass::Sample2D(handle);
+}
+
+void Sound2DHandleClass::Queue_Audio()
+{
+#if defined W3D_HAS_OPENAL
+	// First clean up any finished buffers.
+	ALint processed;
+	alGetSourcei(SampleHandle, AL_BUFFERS_PROCESSED, &processed);
+	while (processed > 0) {
+		ALuint buffer;
+		alSourceUnqueueBuffers(SampleHandle, 1, &buffer);
+		processed--;
+	}
+
+	// Next query how many buffers are still to play.
+	ALint num_queued;
+	alGetSourcei(SampleHandle, AL_BUFFERS_QUEUED, &num_queued);
+	if (num_queued < 0)
+	{
+		num_queued = 0;
+	}
+
+	unsigned count = min(LoopCount, 10u);
+
+	// Repeatedly queue our sample.
+	if (unsigned(num_queued) < count) {
+		count -= num_queued;
+
+		LoopCount -= count;
+
+		while (count--)
+		{
+			alSourceQueueBuffers(SampleHandle, 1, &OpenALBuffer);
+		}
+	}
 #endif
-	return ;
 }

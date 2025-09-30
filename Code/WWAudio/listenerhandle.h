@@ -83,9 +83,8 @@ public:
 	void							Set_Sample_Loop_Count (unsigned count) override				{ }
 	unsigned							Get_Sample_Loop_Count (void) override						{ return 0; }
 	void							Set_Sample_MS_Position (unsigned ms) override					{ }
-	void							Get_Sample_MS_Position (int *len, int *pos) override	{ }
-	int							Get_Sample_Playback_Rate (void) override					{ return 0; }
-	void							Set_Sample_Playback_Rate (int rate) override				{ }
+	float						Get_Sample_Pitch_Factor (void) override { return 0.0F; }
+	void							Set_Sample_Pitch_Factor (float pitch) override { }
 	
 protected:
 	

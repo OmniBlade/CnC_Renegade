@@ -71,14 +71,12 @@ public:
 	//
 	//	Handle access
 	//
-#ifdef W3D_HAS_MILES
-	HSAMPLE						Get_HSAMPLE (void) override		{ return SampleHandle; }
-#endif
+	WWAudioClass::Sample2D	Get_HSAMPLE (void) override		{ return SampleHandle; }
 
 	//
 	//	Inherited
 	//
-	void							Set_Miles_Handle (void *handle) override;
+	void							Set_Miles_Handle (MILES_HANDLE handle) override;
 	void							Initialize (SoundBufferClass *buffer) override;
 	void							Start_Sample (void) override;
 	void							Stop_Sample (void) override;
@@ -94,16 +92,20 @@ public:
 	void							Get_Sample_MS_Position (int *len, int *pos) override;
 	void							Set_Sample_User_Data (int i, void *val) override;
 	void *							Get_Sample_User_Data (int i) override;
-	int							Get_Sample_Playback_Rate (void) override;
-	void							Set_Sample_Playback_Rate (int rate) override;
-	
+	float						Get_Sample_Pitch_Factor (void) override;
+	void							Set_Sample_Pitch_Factor (float pitch) override;
+	void							Queue_Audio() override;
+
 protected:
 	
 	///////////////////////////////////////////////////////////////////
 	//	Protected member data
 	///////////////////////////////////////////////////////////////////
-#ifdef W3D_HAS_MILES
-	HSAMPLE		SampleHandle;
+	WWAudioClass::Sample2D		SampleHandle;
+
+#ifdef W3D_HAS_OPENAL
+	ALuint OpenALBuffer;
+	unsigned LoopCount;
 #endif
 };
 

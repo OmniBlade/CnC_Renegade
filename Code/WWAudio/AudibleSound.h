@@ -45,6 +45,10 @@
 #include "mss.h"
 #endif
 
+#ifdef W3D_HAS_OPENAL
+#include <AL/al.h>
+#endif
+
 //#include <malloc.h>
 #include "vector3.h"
 #include "matrix3d.h"
@@ -74,7 +78,11 @@ class SoundHandleClass;
 //
 //	Typedefs
 //
+#ifdef W3D_HAS_OPENAL
+typedef ALuint MILES_HANDLE;
+#else
 typedef void *MILES_HANDLE;
+#endif
 
 typedef enum
 {
@@ -225,9 +233,6 @@ class AudibleSoundClass : public SoundSceneObjClass
 		//////////////////////////////////////////////////////////////////////
 		//	Playback rate control
 		//////////////////////////////////////////////////////////////////////
-		virtual int					Get_Playback_Rate (void);
-		virtual void				Set_Playback_Rate (int rate_in_hz);
-		
 		virtual float				Get_Pitch_Factor (void)						{ return m_PitchFactor; }
 		virtual void				Set_Pitch_Factor (float factor);
 

@@ -53,6 +53,12 @@ class SoundBufferClass;
 class ListenerHandleClass;
 
 
+#ifdef W3D_HAS_OPENAL
+typedef ALuint MILES_HANDLE;
+#else
+typedef void *MILES_HANDLE;
+#endif
+
 //////////////////////////////////////////////////////////////////////
 //
 //	SoundHandleClass
@@ -83,16 +89,20 @@ public:
 	//
 	//	Handle access
 	//
-#ifdef W3D_HAS_MILES
-	virtual H3DSAMPLE		Get_H3DSAMPLE (void)		{ return NULL; }
-	virtual HSAMPLE		Get_HSAMPLE (void)		{ return NULL; }
-	virtual HSTREAM		Get_HSTREAM (void)		{ return NULL; }
-#endif
+	#if defined W3D_HAS_MILES
+	virtual WWAudioClass::Sample3D		Get_H3DSAMPLE (void)		{ return NULL; }
+	virtual WWAudioClass::Sample2D		Get_HSAMPLE (void)		{ return NULL; }
+	virtual WWAudioClass::StreamType		Get_HSTREAM (void)		{ return NULL; }
+	#else
+	virtual WWAudioClass::Sample3D		Get_H3DSAMPLE (void)		{ return WWAudioClass::Sample3D(-1); }
+	virtual WWAudioClass::Sample2D		Get_HSAMPLE (void)		{ return WWAudioClass::Sample2D(-1); }
+	virtual WWAudioClass::StreamType		Get_HSTREAM (void)		{ return WWAudioClass::StreamType(-1); }
+	#endif
 
 	//
 	//	Initialization
 	//	
-	virtual void	Set_Miles_Handle (void *handle) = 0;
+	virtual void	Set_Miles_Handle (MILES_HANDLE handle) = 0;
 	virtual void	Initialize (SoundBufferClass *buffer);
 
 	//
@@ -112,9 +122,9 @@ public:
 	virtual void	Get_Sample_MS_Position (int *len, int *pos) = 0;
 	virtual void	Set_Sample_User_Data (int i, void *val) = 0;
 	virtual void *	Get_Sample_User_Data (int i) = 0;
-	virtual int		Get_Sample_Playback_Rate (void) = 0;
-	virtual void	Set_Sample_Playback_Rate (int rate) = 0;
-	
+	virtual float	Get_Sample_Pitch_Factor (void) = 0;
+	virtual void	Set_Sample_Pitch_Factor (float pitch) = 0;
+	virtual void	Queue_Audio() {}
 protected:
 	
 	///////////////////////////////////////////////////////////////////

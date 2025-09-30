@@ -82,6 +82,20 @@ Listener3DClass::Initialize_Miles_Handle (void)
 		::AIL_set_3D_orientation (m_SoundHandle->Get_H3DSAMPLE (),
 				0.0F, 0.0F, 1.0F,
 				0.0F, 1.0F, 0.0F);
+#elif defined W3D_HAS_OPENAL
+
+		// TODO, Confirm that OpenAL has Z negated in comparison to Miles .
+		alSource3f(m_SoundHandle->Get_H3DSAMPLE(), AL_POSITION, 0.0F, 0.0F, 0.0F);
+
+		ALfloat orientation[6] = {
+			0.0F,
+			0.0F,
+			-1.0F,
+			0.0F,
+			1.0F,
+			0.0F
+		};
+		alSourcefv(m_SoundHandle->Get_H3DSAMPLE(), AL_ORIENTATION, orientation);
 #endif
 
 		// Associate this object instance with the handle

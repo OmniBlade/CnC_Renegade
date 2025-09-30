@@ -45,7 +45,14 @@
 #include "w3dconfig.h"
 
 #ifdef W3D_HAS_MILES
-#include "mss.h"
+#include <mss.h>
+#endif
+
+#ifdef W3D_HAS_OPENAL
+#include <AL/al.h>
+#include <AL/alc.h>
+#include <AL/alext.h>
+#include <unordered_map>
 #endif
 
 #include "vector.h"
@@ -157,7 +164,22 @@ enum
 class WWAudioClass
 {
 public:
-
+	#if defined W3D_HAS_MILES
+		typedef HSAMPLE Sample2D;
+		typedef H3DSAMPLE Sample3D;
+		typedef H3DPOBJECT ListenType;
+		typedef HSTREAM StreamType;
+	#elif defined W3D_HAS_OPENAL
+		typedef ALuint Sample2D;
+		typedef ALuint Sample3D;
+		typedef ALuint ListenType;
+		typedef ALuint StreamType;
+	#else	
+		typedef int Sample2D;
+		typedef int Sample3D;
+		typedef int ListenType;
+		typedef int StreamType;
+	#endif
 	//////////////////////////////////////////////////////////////////////
 	//	Public data types
 	//////////////////////////////////////////////////////////////////////
@@ -179,6 +201,7 @@ public:
 		DRIVER3D_RSX,
 		DRIVER3D_PSEUDO,
 		DRIVER3D_DOLBY,
+		DRIVER3D_OPENAL,
 		DRIVER3D_COUNT
 	} DRIVER_TYPE_3D;
 
@@ -569,22 +592,8 @@ public:
 	//
 	//	Debug support for determine what sounds are playing on which "channels"
 	//
-	int						Get_2D_Sample_Count (void) const
-	{ 
-#ifdef W3D_HAS_MILES
-		return m_2DSampleHandles.Count ();
-#else
-		return 0;
-#endif
-	}
-	int						Get_3D_Sample_Count (void) const
-	{ 
-#ifdef W3D_HAS_MILES
-		return m_3DSampleHandles.Count ();
-#else
-		return 0;
-#endif
-	}
+	int	Get_2D_Sample_Count (void) const { return m_2DSampleHandles.Count (); }
+	int	Get_3D_Sample_Count (void) const { return m_3DSampleHandles.Count (); }
 	AudibleSoundClass *	Peek_2D_Sample (int index);
 	AudibleSoundClass *	Peek_3D_Sample (int index);
 
@@ -594,6 +603,56 @@ public:
 	// still may have a reference to the object they're attached to.
 	void					Free_Completed_Sounds (void);
 
+#ifdef W3D_HAS_OPENAL
+	void Set_2D_User(Sample2D handle, AudibleSoundClass *user = nullptr) { m_2DSampleUsers[handle] = user; };
+	void Set_3D_User(Sample3D handle, AudibleSoundClass *user = nullptr) { m_3DSampleUsers[handle] = user; };
+	AudibleSoundClass *Get_2D_User(Sample2D handle)
+	{
+		if (m_2DSampleUsers.find(handle) == m_2DSampleUsers.end()) {
+			return nullptr;
+		}
+
+		return m_2DSampleUsers[handle];
+	}
+	AudibleSoundClass *Get_3D_User(Sample3D handle)
+	{
+		if (m_3DSampleUsers.find(handle) == m_3DSampleUsers.end()) {
+			return nullptr;
+		}
+
+		return m_3DSampleUsers[handle];
+	}
+
+	static ALenum Get_AL_Format(unsigned channels, unsigned bits)
+	{
+		if (channels == 1 && bits == 8) {
+			return AL_FORMAT_MONO8;
+		}
+
+		if (channels == 1 && bits == 16){
+			return AL_FORMAT_MONO16;
+		}
+
+		if (channels == 1 && bits == 32) {
+			return AL_FORMAT_MONO_FLOAT32;
+		}
+
+		if (channels == 2 && bits == 8) {
+			return AL_FORMAT_STEREO8;
+		}
+
+		if (channels == 2 && bits == 16) {
+			return AL_FORMAT_STEREO16;
+		}
+
+		if (channels == 2 && bits == 32) {
+			return AL_FORMAT_STEREO_FLOAT32;
+		}
+
+		WWDEBUG_SAY(("Unknown OpenAL format: %u channels, %u bits per sample", channels, bits));
+		return AL_FORMAT_MONO8;
+	}
+#endif
 protected:
 
 	//////////////////////////////////////////////////////////////////////
@@ -613,11 +672,9 @@ protected:
 	void						Release_2D_Handles (void);
 	void						Allocate_3D_Handles (void);
 	void						Release_3D_Handles (void);
-#ifdef W3D_HAS_MILES
-	HSAMPLE					Get_2D_Sample (const AudibleSoundClass &sound_obj);
-	H3DSAMPLE				Get_3D_Sample (const Sound3DClass &sound_obj);
-	H3DPOBJECT				Get_Listener_Handle (void);
-#endif
+	Sample2D				Get_2D_Sample (const AudibleSoundClass &sound_obj);
+	Sample3D				Get_3D_Sample (const Sound3DClass &sound_obj);
+	ListenType			Get_Listener_Handle (void);
 	void						ReAssign_2D_Handles (void);
 	void						ReAssign_3D_Handles (void);
 	void						Remove_2D_Sound_Handles (void);
@@ -755,10 +812,13 @@ private:
 	StringClass											m_Driver3DName;
 	int													m_SpeakerType;
 
-#ifdef W3D_HAS_MILES
 	// Available sample handles
-	DynamicVectorClass<HSAMPLE>					m_2DSampleHandles;
-	DynamicVectorClass<H3DSAMPLE>					m_3DSampleHandles;
+	DynamicVectorClass<Sample2D>					m_2DSampleHandles;
+	DynamicVectorClass<Sample3D>					m_3DSampleHandles;
+
+#ifdef W3D_HAS_OPENAL
+	std::unordered_map<Sample2D, AudibleSoundClass *> m_2DSampleUsers;
+	std::unordered_map<Sample3D, AudibleSoundClass *> m_3DSampleUsers;
 #endif
 
 	// Playlist managment
@@ -780,6 +840,11 @@ private:
 	float													m_EffectsLevel;
 #ifdef W3D_HAS_MILES
 	int													m_ReverbRoomType;
+#endif
+
+#ifdef W3D_HAS_OPENAL
+	ALCdevice *m_alcDevice;
+	ALCcontext *m_alcContext;
 #endif
 
 	// Fade support

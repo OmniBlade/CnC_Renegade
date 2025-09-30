@@ -47,10 +47,16 @@
 #endif
 
 #include "refcount.h"
+#include "w3dconfig.h"
+#ifdef W3D_HAS_FFMPEG
+#include "FFmpegFile.h"
+#endif
+#include <vector>
 
 
 // Forward declarations
 class FileClass;
+struct AVFrame;
 
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -89,8 +95,8 @@ class SoundBufferClass : public RefCountClass
 		//////////////////////////////////////////////////////////////////////
 		//	Buffer access
 		//////////////////////////////////////////////////////////////////////		
-		virtual unsigned char *	Get_Raw_Buffer (void) const	{ return m_Buffer; }
-		virtual unsigned int	Get_Raw_Length (void) const	{ return m_Length; }
+		virtual unsigned char *	Get_Raw_Buffer (void) const	{ return m_Buffer.data(); }
+		virtual unsigned int	Get_Raw_Length (void) const	{ return m_Buffer.size(); }
 
 		//////////////////////////////////////////////////////////////////////
 		//	Information methods
@@ -108,6 +114,9 @@ class SoundBufferClass : public RefCountClass
 		//////////////////////////////////////////////////////////////////////
 		virtual bool				Is_Streaming (void) const		{ return false; }
 
+		virtual bool 				Refresh_Buffer(void) { return false; }
+		virtual void 				Reset_Buffer(void) {}
+
 	protected:
 
 		//////////////////////////////////////////////////////////////////////
@@ -119,7 +128,7 @@ class SoundBufferClass : public RefCountClass
 		//////////////////////////////////////////////////////////////////////
 		//	Protected member data
 		//////////////////////////////////////////////////////////////////////		
-		unsigned char *		m_Buffer;
+		mutable std::vector<unsigned char>		m_Buffer;
 		unsigned int			m_Length;
 		char *					m_Filename;
 		unsigned int			m_Duration;
@@ -162,6 +171,9 @@ class StreamSoundBufferClass : public SoundBufferClass
 		//////////////////////////////////////////////////////////////////////
 		virtual bool			Is_Streaming (void) const override		{ return true; }
 
+
+		virtual bool 			Refresh_Buffer(void) override;
+		virtual void 			Reset_Buffer(void) override;
 	protected:
 
 		//////////////////////////////////////////////////////////////////////
@@ -171,7 +183,11 @@ class StreamSoundBufferClass : public SoundBufferClass
 
 		//////////////////////////////////////////////////////////////////////
 		//	Protected member data
-		//////////////////////////////////////////////////////////////////////		
+		//////////////////////////////////////////////////////////////////////
+#ifdef W3D_HAS_FFMPEG
+		static constexpr int MAX_STREAM_BUFFER = 20000;
+		FFmpegFile m_FileHandle;
+#endif
 };
 
 

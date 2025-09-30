@@ -375,10 +375,30 @@ Sound3DClass::Update_Miles_Transform (void)
 										  -up.Y,
 										  up.Z,
 										  up.X);
+#elif defined W3D_HAS_OPENAL
+		Vector3 position = listener_space_tm.Get_Translation ();
+
+		// TODO, Confirm that OpenAL has Z negated in comparison to Miles .
+		alSource3f(m_SoundHandle->Get_H3DSAMPLE(),
+			AL_POSITION,
+			-position.Y,
+			position.Z,
+			-position.X);
+
+		Vector3 facing	= listener_space_tm.Get_X_Vector ();
+		Vector3 up		= listener_space_tm.Get_Z_Vector ();
+
+		ALfloat orientation[6] = {
+			-facing.Y,
+			facing.Z,
+			-facing.X,
+			-up.Y,
+			up.Z,
+			-up.X
+		};
+		alSourcefv(m_SoundHandle->Get_H3DSAMPLE(), AL_ORIENTATION, orientation);
 #endif
 	}
-
-	return ;
 }
 
 
@@ -425,6 +445,13 @@ Sound3DClass::Set_Position (const Vector3 &position)
 			//
 			::AIL_set_3D_position (m_SoundHandle->Get_H3DSAMPLE (), -listener_space_pos.Y,
 					listener_space_pos.Z, listener_space_pos.X);
+#elif defined W3D_HAS_OPENAL
+		// TODO, Confirm that OpenAL has Z negated in comparison to Miles .
+		alSource3f(m_SoundHandle->Get_H3DSAMPLE(),
+			AL_POSITION,
+			-listener_space_pos.Y,
+			listener_space_pos.Z,
+			-listener_space_pos.X);
 #endif
 		}
 	}
@@ -457,6 +484,13 @@ Sound3DClass::Set_Velocity (const Vector3 &velocity)
 												-m_CurrentVelocity.Y,
 												m_CurrentVelocity.Z,
 												m_CurrentVelocity.X);
+#elif defined W3D_HAS_OPENAL
+		// TODO, Confirm that OpenAL has Z negated in comparison to Miles .
+		alSource3f(m_SoundHandle->Get_H3DSAMPLE(),
+			AL_VELOCITY,
+			-m_CurrentVelocity.Y,
+			m_CurrentVelocity.Z,
+			-m_CurrentVelocity.X);
 #endif
 	}
 
@@ -483,6 +517,8 @@ Sound3DClass::Set_DropOff_Radius (float radius)
 		::AIL_set_3D_sample_distances (	m_SoundHandle->Get_H3DSAMPLE (),
 													m_DropOffRadius,
 													(m_MaxVolRadius > 1.0F) ? m_MaxVolRadius : 1.0F);
+#elif defined W3D_HAS_OPENAL
+		alSourcef(m_SoundHandle->Get_H3DSAMPLE(), AL_MAX_DISTANCE, m_DropOffRadius);
 #endif
 	}
 
@@ -507,6 +543,8 @@ Sound3DClass::Set_Max_Vol_Radius (float radius)
 		::AIL_set_3D_sample_distances (	m_SoundHandle->Get_H3DSAMPLE (),
 													m_DropOffRadius,
 													(m_MaxVolRadius > 1.0F) ? m_MaxVolRadius : 1.0F);
+#elif defined W3D_HAS_OPENAL
+		alSourcef(m_SoundHandle->Get_H3DSAMPLE(), AL_REFERENCE_DISTANCE, (m_MaxVolRadius > 1.0F) ? m_MaxVolRadius : 1.0F);
 #endif
 	}
 
@@ -566,6 +604,10 @@ Sound3DClass::Initialize_Miles_Handle (void)
 		//
 		::AIL_set_3D_sample_effects_level (m_SoundHandle->Get_H3DSAMPLE (),
 				WWAudioClass::Get_Instance ()->Get_Effects_Level ());
+#elif defined W3D_HAS_OPENAL
+		alSourcef(m_SoundHandle->Get_H3DSAMPLE(), AL_REFERENCE_DISTANCE, (m_MaxVolRadius > 1.0F) ? m_MaxVolRadius : 1.0F);
+		alSourcef(m_SoundHandle->Get_H3DSAMPLE(), AL_MAX_DISTANCE, m_DropOffRadius);
+		// TODO OpenAL EFX based reverb effects?
 #endif
 		//
 		//	Pass the sound's position and orientation onto Miles
@@ -616,9 +658,7 @@ Sound3DClass::Allocate_Miles_Handle (void)
 	// If we need to, get a play-handle from the audio system
 	//
 	if (m_SoundHandle == NULL) {
-#ifdef W3D_HAS_MILES
 		Set_Miles_Handle ((MILES_HANDLE)WWAudioClass::Get_Instance ()->Get_3D_Sample (*this));
-#endif
 	}
 
 	return ;

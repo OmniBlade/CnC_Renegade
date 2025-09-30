@@ -931,56 +931,7 @@ AudibleSoundClass::Set_Pitch_Factor (float factor)
 	// Do we have a valid sample handle from miles?
 	//
 	if (m_SoundHandle != NULL) {
-
-		if (m_Buffer != NULL) {
-
-			//
-			//	Get the base rate of the sound and scale our playback rate
-			// based on the factor
-			//
-			int base_rate	= m_Buffer->Get_Rate ();
-			int new_rate	= base_rate * m_PitchFactor;
-			m_SoundHandle->Set_Sample_Playback_Rate (new_rate);
-		}
-	}
-
-	return ;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//	Get_Playback_Rate
-//
-////////////////////////////////////////////////////////////////////////////////////////////////
-int
-AudibleSoundClass::Get_Playback_Rate (void)
-{
-	MMSLockClass lock;
-	int retval = 0;
-
-	// Do we have a valid sample handle from miles?
-	if (m_SoundHandle != NULL) {
-		retval = m_SoundHandle->Get_Sample_Playback_Rate ();
-	}
-
-	return retval;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//	Set_Playback_Rate
-//
-////////////////////////////////////////////////////////////////////////////////////////////////
-void
-AudibleSoundClass::Set_Playback_Rate (int rate_in_hz)
-{
-	MMSLockClass lock;
-
-	// Do we have a valid sample handle from miles?
-	if (m_SoundHandle != NULL) {
-		m_SoundHandle->Set_Sample_Playback_Rate (rate_in_hz);
+		m_SoundHandle->Set_Sample_Pitch_Factor (m_PitchFactor);
 	}
 
 	return ;
@@ -1151,6 +1102,13 @@ AudibleSoundClass::On_Frame_Update (unsigned int milliseconds)
 		m_LogicalSound->Set_Transform (m_Transform);
 	}
 
+	//
+	// OpenAL addition, attempt to queue audio if the handle buffer is streaming.
+	//
+	if (m_SoundHandle != NULL) {
+		m_SoundHandle->Queue_Audio();
+	}
+
 	return true;
 }
 
@@ -1199,9 +1157,7 @@ AudibleSoundClass::Allocate_Miles_Handle (void)
 	// If we need to, get a play-handle from the audio system
 	//
 	if (m_SoundHandle == NULL) {
-#ifdef W3D_HAS_MILES
 		Set_Miles_Handle ((MILES_HANDLE)WWAudioClass::Get_Instance ()->Get_2D_Sample (*this));
-#endif
 	}
 
 	return ;

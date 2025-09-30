@@ -36,7 +36,6 @@
 
 
 #include "always.h"
-#include <windows.h>
 #include "WWAudio.h"
 #include "wwdebug.h"
 #include "Utils.h"
@@ -59,6 +58,32 @@
 #include "ini.h"
 #include <algorithm>
 
+#ifdef W3D_HAS_OPENAL
+#include <AL/alext.h>
+#define LOAD_ALC_PROC(N) N = reinterpret_cast<decltype(N)>(alcGetProcAddress(m_alcDevice, #N))
+
+
+// Debug callback for OpenAL errors
+static void AL_APIENTRY Debug_Callback_AL(ALenum source, ALenum type, ALuint id,
+	ALenum severity, ALsizei length, const ALchar* message, void* userParam ) AL_API_NOEXCEPT17
+{
+	switch (severity)
+	{
+	case AL_DEBUG_SEVERITY_HIGH_EXT:
+		WWDEBUG_SAY(("OpenAL Error: %s\n", message));
+		break;
+	case AL_DEBUG_SEVERITY_MEDIUM_EXT:
+		WWDEBUG_SAY(("OpenAL Warning: %s\n", message));
+		break;
+	case AL_DEBUG_SEVERITY_LOW_EXT:
+		WWDEBUG_SAY(("OpenAL Info: %s\n", message));
+		break;
+	default:
+		WWDEBUG_SAY(("OpenAL Message: %s\n", message));
+		break;
+	}
+}
+#endif
 
 #ifdef G_CODE_BASE
 #include "../wwlib/argv.h"
@@ -106,7 +131,7 @@ const char *INI_CINEMATIC_VOLUME_ENTRY		= "CINEMATIC_VOLUME";
 ////////////////////////////////////////////////////////////////////////////////////////////////
 //	Local inlines
 ////////////////////////////////////////////////////////////////////////////////////////////////
-__inline bool
+inline bool
 WWAudioClass::Is_OK_To_Give_Handle (const AudibleSoundClass &sound_obj)
 {
 	bool is_ok = false;
@@ -170,6 +195,10 @@ WWAudioClass::WWAudioClass (bool lite)
 	  m_BackgroundMusic (NULL),
 #ifdef W3D_HAS_MILES
 	  m_ReverbRoomType (ENVIRONMENT_GENERIC),
+#endif
+#ifdef W3D_HAS_OPENAL
+		m_alcDevice(nullptr),
+		m_alcContext(nullptr),
 #endif
 	  m_NonDialogFadeTime (DEF_FADE_TIME),
 	  m_FadeType (FADE_NONE),
@@ -294,6 +323,7 @@ WWAudioClass::Open_2D_Device (WaveFormatStruct *format)
 	m_PlaybackBits		= (format->nAvgBytesPerSec << 3) / (format->nChannels * format->nSamplesPerSec);
 	m_PlaybackStereo	= bool(format->nChannels > 1);
 
+#ifdef W3D_HAS_MILES
 	//
 	// Assume we will open the DirectSound driver
 	//
@@ -303,7 +333,6 @@ WWAudioClass::Open_2D_Device (WaveFormatStruct *format)
 	// all the sound handles away from the sound objects.
 	Close_2D_Device ();
 
-#ifdef W3D_HAS_MILES
 	AIL_set_preference (AIL_LOCK_PROTECTION, NO);
 
 	// Try to use DirectSound if possible
@@ -311,7 +340,7 @@ WWAudioClass::Open_2D_Device (WaveFormatStruct *format)
 	//WWASSERT (success == AIL_NO_ERROR);		// This assert fires if there is no sound card.
 
 	// Open the driver
-	success = ::AIL_waveOutOpen (&m_Driver2D, NULL, 0, format);
+	success = ::AIL_waveOutOpen (&m_Driver2D, NULL, 0, (LPWAVEFORMAT)format);
 
 	// Do we need to switch from direct sound to waveout?
 	if ((success == AIL_NO_ERROR) &&
@@ -331,7 +360,7 @@ WWAudioClass::Open_2D_Device (WaveFormatStruct *format)
 		//WWASSERT (success == AIL_NO_ERROR);	// This assert fires if there is no sound card.
 
 		// Open the driver
-		success = ::AIL_waveOutOpen (&m_Driver2D, NULL, 0, format);
+		success = ::AIL_waveOutOpen (&m_Driver2D, NULL, 0, (LPWAVEFORMAT)format);
 		type = (success == AIL_NO_ERROR) ? DRIVER2D_WAVEOUT : DRIVER2D_ERROR;
 	}
 
@@ -343,10 +372,52 @@ WWAudioClass::Open_2D_Device (WaveFormatStruct *format)
 		Close_2D_Device ();
 		WWDEBUG_SAY (("WWAudio: Error initializing 2D device.\r\n"));
 	}
-#endif
 
 	// Return the opened device type
 	return type;
+#elif defined W3D_HAS_OPENAL
+	//
+	// Assume we will open the DirectSound driver
+	//
+	DRIVER_TYPE_2D type = DRIVER2D_OPENAL;
+
+	// First close the current 2D device and take
+	// all the sound handles away from the sound objects.
+	Close_2D_Device ();
+	m_alcDevice = alcOpenDevice(nullptr);
+	
+	ALCint attributes[] = { ALC_FREQUENCY, m_PlaybackRate, 0 /* end-of-list */ };
+	m_alcContext = alcCreateContext(m_alcDevice, attributes);
+	if (m_alcContext == nullptr) {
+		WWDEBUG_SAY(("Failed to create ALC context"));
+		type = DRIVER2D_ERROR;
+	}
+
+	if (!alcMakeContextCurrent(m_alcContext)) {
+		WWDEBUG_SAY(("Failed to make ALC context current"));
+		type = DRIVER2D_ERROR;
+	}
+
+	if (alcIsExtensionPresent(m_alcDevice, "ALC_EXT_debug")) {
+		LPALDEBUGMESSAGECALLBACKEXT alDebugMessageCallbackEXT;
+		LOAD_ALC_PROC(alDebugMessageCallbackEXT);
+		alEnable(AL_DEBUG_OUTPUT_EXT);
+		alDebugMessageCallbackEXT(Debug_Callback_AL, nullptr);
+	}
+
+	// Allocate all the available handles if we were successful
+	if (type != DRIVER2D_ERROR) {
+		Allocate_2D_Handles ();
+		ReAssign_2D_Handles ();
+	} else {
+		Close_2D_Device ();
+		WWDEBUG_SAY (("WWAudio: Error initializing 2D device.\r\n"));
+	}
+
+	return type;
+#else
+	return DRIVER2D_ERROR;
+#endif
 }
 
 
@@ -374,7 +445,7 @@ WWAudioClass::Open_2D_Device
 	wave_format.wBitsPerSample = bits;
 	DRIVER_TYPE_2D type = DRIVER2D_ERROR;
 
-	while (((type = Open_2D_Device ((LPWAVEFORMAT)&wave_format)) == DRIVER2D_ERROR) &&
+	while (((type = Open_2D_Device ((WaveFormatStruct*)&wave_format)) == DRIVER2D_ERROR) &&
 			 (wave_format.wf.nSamplesPerSec >= 11025)) {
 
 		//
@@ -383,6 +454,28 @@ WWAudioClass::Open_2D_Device
 		wave_format.wf.nSamplesPerSec = wave_format.wf.nSamplesPerSec >> 1;
 		wave_format.wf.nAvgBytesPerSec = (wave_format.wf.nChannels * wave_format.wf.nSamplesPerSec * bits) >> 3;
 		wave_format.wf.nBlockAlign = (wave_format.wf.nChannels * bits) >> 3;
+	}
+
+	// Pass this structure onto the function that actually opens the device
+	return type;
+#elif defined W3D_HAS_OPENAL
+	WaveFormatStruct wave_format = { 0 };
+	wave_format.nChannels = stereo ? 2 : 1;
+	wave_format.nSamplesPerSec = hertz;
+	wave_format.nAvgBytesPerSec = (wave_format.nChannels * wave_format.nSamplesPerSec * bits) >> 3;
+	wave_format.nBlockAlign = (wave_format.nChannels * bits) >> 3;
+
+	DRIVER_TYPE_2D type = DRIVER2D_ERROR;
+
+	while (((type = Open_2D_Device (&wave_format)) == DRIVER2D_ERROR) &&
+			 (wave_format.nSamplesPerSec >= 11025)) {
+
+		//
+		//	Cut the playback rate in half and try again
+		//
+		wave_format.nSamplesPerSec = wave_format.nSamplesPerSec >> 1;
+		wave_format.nAvgBytesPerSec = (wave_format.nChannels * wave_format.nSamplesPerSec * bits) >> 3;
+		wave_format.nBlockAlign = (wave_format.nChannels * bits) >> 3;
 	}
 
 	// Pass this structure onto the function that actually opens the device
@@ -404,7 +497,7 @@ WWAudioClass::Close_2D_Device (void)
 	MMSLockClass lock;
 
 	//
-	//	Note:  We MUST close the 3D device when we close the 2D device...
+	//	Note:  We MUST close the 3D device when we close the 2D device for Miles ...
 	//
 	Close_3D_Device ();
 
@@ -429,7 +522,21 @@ WWAudioClass::Close_2D_Device (void)
 		retval = true;
 	}
 #endif
+#ifdef W3D_HAS_OPENAL
+	alcMakeContextCurrent(nullptr);
 
+	if (m_alcContext) {
+		alcDestroyContext(m_alcContext);
+		m_alcContext = nullptr;
+	}
+
+	if (m_alcDevice) {
+		alcCloseDevice(m_alcDevice);
+		m_alcDevice = nullptr;
+	}
+
+	retval = true;
+#endif
 	return retval;
 }
 
@@ -1595,7 +1702,7 @@ WWAudioClass::Release_2D_Handles (void)
 {
 	MMSLockClass lock;
 
-#ifdef W3D_HAS_MILES
+#if defined W3D_HAS_MILES
 	// Release our hold on all the samples we've allocated
 	for (int index = 0; index < m_2DSampleHandles.Count (); index ++) {
 		HSAMPLE sample = m_2DSampleHandles[index];
@@ -1605,8 +1712,19 @@ WWAudioClass::Release_2D_Handles (void)
 	}
 
 	m_2DSampleHandles.Delete_All ();
+#elif defined W3D_HAS_OPENAL
+	if (!m_2DSampleHandles.Count()) {
+		return;
+	}
+
+	alDeleteSources(m_2DSampleHandles.Count(), &m_2DSampleHandles[0]);
+
+	if(alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Release_2D_Handles an error occured while freeing handles."));
+	}
+	
+	m_2DSampleHandles.Delete_All();
 #endif
-	return;
 }
 
 
@@ -1623,7 +1741,7 @@ WWAudioClass::Allocate_2D_Handles (void)
 	// Start fresh
 	Release_2D_Handles ();
 
-#ifdef W3D_HAS_MILES
+#if defined W3D_HAS_MILES
 	if (m_Driver2D != NULL) {
 
 		// Attempt to allocate our share of 2D sample handles
@@ -1638,21 +1756,35 @@ WWAudioClass::Allocate_2D_Handles (void)
 		// Record our actual number of available 2D sample handles
 		m_Max2DSamples = m_2DSampleHandles.Count ();
 	}
-#endif
+#elif defined W3D_HAS_OPENAL
+	m_2DSampleHandles.Resize(m_Max2DSamples);
+	alGetError(); // Clear any existing error
+	alGenSources(m_Max2DSamples, &m_2DSampleHandles[0]);
 
-	return;
+	if(alGetError() == AL_NO_ERROR) {
+		m_2DSampleHandles.Set_Active(m_Max2DSamples);
+		for (int i = 0; i < m_2DSampleHandles.Count(); ++i) {
+			alSourcei(m_2DSampleHandles[i], AL_SOURCE_RELATIVE, AL_TRUE);
+
+			if (alGetError() != AL_NO_ERROR) {
+				WWDEBUG_SAY(("Setting handles relative to listener failed for sample %d.", i));
+			}
+		}
+	} else {
+		WWDEBUG_SAY(("Allocate_2D_Handles failed."));
+	}
+#endif
 }
 
-
-#ifdef W3D_HAS_MILES
 ////////////////////////////////////////////////////////////////////////////////////////////
 //
 //	Get_2D_Sample
 //
 ////////////////////////////////////////////////////////////////////////////////////////////
-HSAMPLE
+WWAudioClass::Sample2D
 WWAudioClass::Get_2D_Sample (const AudibleSoundClass &sound_obj)
 {
+#if defined W3D_HAS_MILES
 	if (Is_OK_To_Give_Handle (sound_obj) == false) {
 		return (HSAMPLE)INVALID_MILES_HANDLE;
 	}
@@ -1710,6 +1842,67 @@ WWAudioClass::Get_2D_Sample (const AudibleSoundClass &sound_obj)
 
 	// Return the free sample handle if we found one
 	return free_sample;
+#elif defined W3D_HAS_OPENAL
+	if (Is_OK_To_Give_Handle (sound_obj) == false) {
+		return Sample2D(AL_INVALID);
+	}
+
+	float lowest_priority					= sound_obj.Get_Priority ();
+	float lowest_runtime_priority			= sound_obj.Get_Runtime_Priority ();
+	AudibleSoundClass *lowest_pri_sound = NULL;
+	Sample2D lowest_pri_sample			= Sample2D(AL_INVALID);
+	Sample2D free_sample						= Sample2D(AL_INVALID);
+
+	// Loop through all the available sample handles and try to find
+	// one that isn't being used to play a sound.
+	bool found = false;
+	for (int index = 0; (index < m_2DSampleHandles.Count ()) && !found; index ++) {
+		ALint state;
+		Sample2D sample = m_2DSampleHandles[index];
+		alGetError(); // Clear any existing error
+		alGetSourcei(sample, AL_SOURCE_STATE, &state);
+		if (alGetError() == AL_NO_ERROR && state != AL_PLAYING) {
+
+			// Get a pointer to the object that is currently using this sample
+			AudibleSoundClass *sound_obj = Get_2D_User(sample);
+			if (sound_obj == NULL) {
+
+				// Return this sample handle to the caller
+				free_sample = sample;
+				found = true;
+			} else {
+
+				//
+				//	Determine if this sound's priority is lesser then the sound we want to play.
+				// This is done by comparing both the designer-specified priority and the current
+				// runtime priority (which is calculated by distance to the listener).
+				//
+				float priority				= sound_obj->Get_Priority ();
+				float runtime_priority	= sound_obj->Get_Runtime_Priority ();
+				if (	(priority < lowest_priority) ||
+						(priority == lowest_priority && runtime_priority <= lowest_runtime_priority))
+				{
+					lowest_priority			= priority;
+					lowest_pri_sound			= sound_obj;
+					lowest_pri_sample			= sample;
+					lowest_runtime_priority = runtime_priority;
+				}
+			}
+		}
+	}
+
+	// Steal the sample handle from the lower priority
+	// sound and return the handle to the caller.
+	if ((found == false) && (lowest_pri_sound != NULL)) {
+		lowest_pri_sound->Free_Miles_Handle ();
+		free_sample = lowest_pri_sample;
+	}
+
+	// Return the free sample handle if we found one
+	return free_sample;
+#else
+	return -1;
+#endif
 }
 
 
@@ -1718,9 +1911,10 @@ WWAudioClass::Get_2D_Sample (const AudibleSoundClass &sound_obj)
 //	Get_3D_Sample
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////
-H3DSAMPLE
+WWAudioClass::Sample3D
 WWAudioClass::Get_3D_Sample (const Sound3DClass &sound_obj)
 {
+#if defined W3D_HAS_MILES
 	if (Is_OK_To_Give_Handle (sound_obj) == false) {
 		return (H3DSAMPLE)INVALID_MILES_HANDLE;
 	}
@@ -1779,6 +1973,67 @@ WWAudioClass::Get_3D_Sample (const Sound3DClass &sound_obj)
 
 	// Return the free sample handle if we found one
 	return free_sample;
+#elif defined W3D_HAS_OPENAL
+	if (Is_OK_To_Give_Handle (sound_obj) == false) {
+		return Sample3D(AL_INVALID);
+	}
+
+	float lowest_priority					= sound_obj.Get_Priority ();
+	float lowest_runtime_priority			= sound_obj.Get_Runtime_Priority ();
+	AudibleSoundClass *lowest_pri_sound = NULL;
+	Sample3D lowest_pri_sample			= Sample3D(AL_INVALID);
+	Sample3D free_sample						= Sample3D(AL_INVALID);
+
+	// Loop through all the available sample handles and try to find
+	// one that isn't being used to play a sound.
+	bool found = false;
+	for (int index = 0; (index < m_3DSampleHandles.Count ()) && !found; index ++) {
+		ALint state;
+		Sample3D sample = m_3DSampleHandles[index];
+		alGetError(); // Clear any existing error
+		alGetSourcei(sample, AL_SOURCE_STATE, &state);
+		if (alGetError() == AL_NO_ERROR && state != AL_PLAYING) {
+
+			// Get a pointer to the object that is currently using this sample
+			AudibleSoundClass *sound_obj = Get_3D_User(sample);
+			if (sound_obj == NULL) {
+
+				// Return this sample handle to the caller
+				free_sample = sample;
+				found = true;
+			} else {
+
+				//
+				//	Determine if this sound's priority is lesser then the sound we want to play.
+				// This is done by comparing both the designer-specified priority and the current
+				// runtime priority (which is calculated by distance to the listener).
+				//
+				float priority				= sound_obj->Get_Priority ();
+				float runtime_priority	= sound_obj->Get_Runtime_Priority ();
+				if (	(priority < lowest_priority) ||
+						(priority == lowest_priority && runtime_priority <= lowest_runtime_priority))
+				{
+					lowest_priority			= priority;
+					lowest_pri_sound			= sound_obj;
+					lowest_pri_sample			= sample;
+					lowest_runtime_priority = runtime_priority;
+				}
+			}
+		}
+	}
+
+	// Steal the sample handle from the lower priority
+	// sound and return the handle to the caller.
+	if ((found == false) && (lowest_pri_sound != NULL)) {
+		lowest_pri_sound->Free_Miles_Handle ();
+		free_sample = lowest_pri_sample;
+	}
+
+	// Return the free sample handle if we found one
+	return free_sample;
+#else
+	return -1;
+#endif
 }
 
 
@@ -1787,13 +2042,16 @@ WWAudioClass::Get_3D_Sample (const Sound3DClass &sound_obj)
 //	Get_Listener_Handle
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////
-H3DPOBJECT
+WWAudioClass::ListenType
 WWAudioClass::Get_Listener_Handle (void)
 {
+#if defined W3D_HAS_MILES
 	MMSLockClass lock;
 	return ::AIL_3D_open_listener (m_Driver3D);
-}
+#else
+	return 0; // Not needed for OpenAL.
 #endif
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -1825,7 +2083,6 @@ WWAudioClass::Build_3D_Driver_List (void)
 			WWDEBUG_SAY (("WWAudio: Reason %s.\r\n", error_info));
 		}
 	}
-#endif
 
 	//
 	// Attempt to select one of the known drivers (in the following order).
@@ -1845,6 +2102,13 @@ WWAudioClass::Build_3D_Driver_List (void)
 	}
 
 	return;
+#else
+	DRIVER_INFO_STRUCT *info = new DRIVER_INFO_STRUCT;
+	info->driver = nullptr;
+	info->name = ::strdup ("OpenAL");
+	m_Driver3DList.Add (info);
+	Select_3D_Device (DRIVER3D_OPENAL);
+#endif
 }
 
 
@@ -2047,6 +2311,10 @@ WWAudioClass::Find_3D_Device (DRIVER_TYPE_3D type)
 		case DRIVER3D_DOLBY:
 			sub_string = "Dolby";
 			break;
+
+		case DRIVER3D_OPENAL:
+			sub_string = "OpenAL";
+			break;
 	}
 
 	// Loop through all the driver entries and free them all
@@ -2092,9 +2360,26 @@ WWAudioClass::Allocate_3D_Handles (void)
 			}
 		}
 	}
-#endif
+#elif defined W3D_HAS_OPENAL
+	m_3DSampleHandles.Resize(m_Max3DSamples);
+	alGetError(); // Clear any existing error
+	alGenSources(m_Max3DSamples, &m_3DSampleHandles[0]);
 
-	return;
+	if(alGetError() == AL_NO_ERROR) {
+		m_3DSampleHandles.Set_Active(m_Max2DSamples);
+		for (int i = 0; i < m_3DSampleHandles.Count(); ++i) {
+			alSourcei(m_3DSampleHandles[i], AL_SOURCE_RELATIVE, AL_TRUE);
+
+			if (alGetError() != AL_NO_ERROR) {
+				WWDEBUG_SAY(("Setting handles relative to listener failed for sample %d.", i));
+			}
+		}
+	} else {
+		WWDEBUG_SAY(("Allocate_3D_Handles failed."));
+	}
+
+	
+#endif
 }
 
 
@@ -2120,8 +2405,20 @@ WWAudioClass::Release_3D_Handles (void)
 	}
 
 	m_3DSampleHandles.Delete_All ();
+
+#elif defined W3D_HAS_OPENAL
+	if (m_3DSampleHandles.Count() == 0) {
+		return;
+	}
+
+	alGetError(); // Clear any existing error
+	alDeleteSources(m_3DSampleHandles.Count(), &m_3DSampleHandles[0]);
+
+	if(alGetError() != AL_NO_ERROR) {
+		WWDEBUG_SAY(("Release_3D_Handles an error occured while freeing handles."));
+	}
+	m_3DSampleHandles.Delete_All();
 #endif
-	return;
 }
 
 
@@ -2135,18 +2432,18 @@ WWAudioClass::Validate_3D_Sound_Buffer (SoundBufferClass *buffer)
 {
 	bool retval = false;
 
-#ifdef W3D_HAS_MILES
 	//
 	// 3D sound buffer MUST be uncompressed mono WAV data
 	//
 	if ((buffer != NULL) &&
 		 (buffer->Get_Channels () == 1) &&
+#ifdef W3D_HAS_MILES // We don't care about format for OpenAL as we will decode it regardless.
 		 (buffer->Get_Type () == WAVE_FORMAT_PCM) &&
+#endif
 		 (buffer->Is_Streaming () == false))
 	{
 		retval = true;
 	}
-#endif
 
 	// Return a true/false result code
 	return retval;
@@ -2229,6 +2526,26 @@ WWAudioClass::Remove_2D_Sound_Handles (void)
 			}
 		}
 	}
+#elif defined W3D_HAS_OPENAL
+	//
+	//	Loop over all the 2D handles
+	//
+	for (int index = 0; index < m_2DSampleHandles.Count (); index ++) {
+		ALint state;
+		Sample2D sample = m_2DSampleHandles[index];
+		alGetError(); // Clear any existing errors
+		alGetSourcei(sample, AL_SOURCE_STATE, &state);
+		if (alGetError() == AL_NO_ERROR) {
+
+			//
+			// Get a pointer to the object that is currently using this sample
+			//
+			AudibleSoundClass *sound_obj = Get_2D_User(sample);
+			if (sound_obj != NULL) {
+				sound_obj->Free_Miles_Handle ();
+			}
+		}
+	}
 #endif
 
 	return;
@@ -2255,6 +2572,26 @@ WWAudioClass::Remove_3D_Sound_Handles (void)
 			// Get a pointer to the object that is currently using this sample
 			//
 			AudibleSoundClass *sound_obj = (AudibleSoundClass *)::AIL_3D_object_user_data (sample, INFO_OBJECT_PTR);
+			if (sound_obj != NULL) {
+				sound_obj->Free_Miles_Handle ();
+			}
+		}
+	}
+#elif defined W3D_HAS_OPENAL
+	//
+	//	Loop over all the 3D handles
+	//
+	for (int index = 0; index < m_3DSampleHandles.Count (); index ++) {
+		ALint state;
+		Sample3D sample = m_3DSampleHandles[index];
+		alGetError(); // Clear any existing errors
+		alGetSourcei(sample, AL_SOURCE_STATE, &state);
+		if (alGetError() == AL_NO_ERROR) {
+
+			//
+			// Get a pointer to the object that is currently using this sample
+			//
+			AudibleSoundClass *sound_obj = Get_3D_User(sample);
 			if (sound_obj != NULL) {
 				sound_obj->Free_Miles_Handle ();
 			}
@@ -3608,7 +3945,6 @@ WWAudioClass::Update_Fade (void)
 AudibleSoundClass *
 WWAudioClass::Peek_2D_Sample (int index)
 {
-#ifdef W3D_HAS_MILES
 	if (index < 0 || index > m_2DSampleHandles.Count ()) {
 		return NULL;
 	}
@@ -3616,6 +3952,7 @@ WWAudioClass::Peek_2D_Sample (int index)
 	MMSLockClass lock;
 	AudibleSoundClass *retval = NULL;
 
+#ifdef W3D_HAS_MILES
 	//
 	// Try to get the sound object associated with this handle
 	//
@@ -3623,11 +3960,19 @@ WWAudioClass::Peek_2D_Sample (int index)
 	if (sample != NULL) {
 		retval = (AudibleSoundClass *)::AIL_sample_user_data (sample, INFO_OBJECT_PTR);
 	}
-
-	return retval;
-#else
-	return nullptr;
+#elif defined W3D_HAS_OPENAL
+	//
+	// Try to get the sound object associated with this handle
+	//
+	ALint state;
+	Sample2D sample = m_2DSampleHandles[index];
+	alGetError(); // Clear any existing error.
+	alGetSourcei(sample, AL_SOURCE_STATE, &state);
+	if (alGetError() == AL_NO_ERROR) {
+		retval = Get_2D_User(sample);
+	}
 #endif
+	return retval;
 }
 
 
@@ -3639,7 +3984,6 @@ WWAudioClass::Peek_2D_Sample (int index)
 AudibleSoundClass *
 WWAudioClass::Peek_3D_Sample (int index)
 {
-#ifdef W3D_HAS_MILES
 	if (index < 0 || index > m_3DSampleHandles.Count ()) {
 		return NULL;
 	}
@@ -3647,6 +3991,7 @@ WWAudioClass::Peek_3D_Sample (int index)
 	MMSLockClass lock;
 	AudibleSoundClass *retval = NULL;
 
+#ifdef W3D_HAS_MILES
 	//
 	// Try to get the sound object associated with this handle
 	//
@@ -3654,11 +3999,19 @@ WWAudioClass::Peek_3D_Sample (int index)
 	if (sample != NULL) {
 		retval = (AudibleSoundClass *)::AIL_3D_object_user_data (sample, INFO_OBJECT_PTR);
 	}
-
-	return retval;
-#else
-	return nullptr;
+#elif defined W3D_HAS_OPENAL
+	//
+	// Try to get the sound object associated with this handle
+	//
+	ALint state;
+	Sample3D sample = m_3DSampleHandles[index];
+	alGetError(); // Clear any existing error.
+	alGetSourcei(sample, AL_SOURCE_STATE, &state);
+	if (alGetError() == AL_NO_ERROR) {
+		retval = Get_3D_User(sample);
+	}
 #endif
+	return retval;
 }
 
 
@@ -3752,6 +4105,7 @@ WWAudioClass::Set_Speaker_Type (int speaker_type)
 {
 	m_SpeakerType = speaker_type;
 
+	// OpenAL is supposed to detect this and configure itself and doesn't allow user to specify.
 #ifdef W3D_HAS_MILES
 	//
 	//	Pass the new speaker type onto miles
